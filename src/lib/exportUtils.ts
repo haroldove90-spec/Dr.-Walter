@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import QRCode from 'qrcode';
 import { Patient, Appointment, Prescription } from '../types';
 
 // Extend jsPDF with autotable
@@ -297,8 +298,26 @@ export const exportPrescriptionToPDF = async (patient: Patient, prescription: Pr
   // Bottom Disclaimer
   doc.setFontSize(8);
   doc.setTextColor(150);
-  doc.text('Esta receta tiene una validez de 30 días a partir de su fecha de emisión.', 105, 285, { align: 'center' });
-  doc.text('Clínica Guidos - Sistema de Gestión Médica Digital', 105, 290, { align: 'center' });
+  doc.text('Esta receta tiene una validez de 30 días a partir de su fecha de emisión.', 105, 280, { align: 'center' });
+  doc.text('Clínica Guidos - Sistema de Gestión Médica Digital', 105, 285, { align: 'center' });
+
+  // QR Code for Validation
+  try {
+    const validationUrl = `https://clinicaguidos.com/validate/${prescription.id || 'RX-' + Date.now()}`;
+    const qrDataUrl = await QRCode.toDataURL(validationUrl, {
+      margin: 1,
+      width: 100,
+      color: {
+        dark: '#004990',
+        light: '#FFFFFF'
+      }
+    });
+    doc.addImage(qrDataUrl, 'PNG', 170, 260, 25, 25);
+    doc.setFontSize(6);
+    doc.text('Validar Receta', 182.5, 287, { align: 'center' });
+  } catch (err) {
+    console.error('Error generating QR code:', err);
+  }
 
   const dateStr = new Date().toLocaleDateString('es-ES').replace(/\//g, '-');
   const fileName = `Receta_${patient.firstName}_${patient.lastName}_${dateStr}.pdf`;

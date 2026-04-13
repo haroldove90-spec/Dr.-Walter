@@ -19,11 +19,15 @@ export function PhysioWidgets({ patients }: { patients: Patient[] }) {
   const activeRehab = physioPatients
     .map(p => {
       const last = p.history?.filter(h => h.specialty === 'Fisioterapia' || h.specialty === 'Ortopedia').pop();
+      const rehab = last?.data?.rehabPlan;
       return {
         name: `${p.firstName} ${p.lastName}`,
-        session: last?.data?.sessionNumber || 1,
-        total: 10,
-        task: last?.diagnosis || 'Rehabilitación General'
+        session: rehab?.sessionsCompleted || 1,
+        total: rehab?.sessionsTotal || 10,
+        task: rehab?.diagnosis || last?.diagnosis || 'Rehabilitación General',
+        evaInitial: rehab?.evaInitial || 8,
+        evaCurrent: rehab?.evaCurrent || 5,
+        mobility: rehab?.mobilityDegrees
       };
     })
     .slice(0, 3);
@@ -33,40 +37,47 @@ export function PhysioWidgets({ patients }: { patients: Patient[] }) {
       <Card className="lg:col-span-2 border-none shadow-sm rounded-[2rem] overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between px-8 pt-8">
           <CardTitle className="text-lg font-bold text-[#004990] flex items-center gap-2">
-            <MapIcon className="text-secondary" size={20} />
-            Mapa de Lesiones Activas
+            <Activity className="text-secondary" size={20} />
+            Control de Dolor y Movilidad
           </CardTitle>
-          <Badge className="bg-secondary/10 text-secondary border-none rounded-xl px-3 py-1 text-[10px] font-bold uppercase tracking-wider">Vista Anatómica</Badge>
+          <Badge className="bg-secondary/10 text-secondary border-none rounded-xl px-3 py-1 text-[10px] font-bold uppercase tracking-wider">Progreso Clínico</Badge>
         </CardHeader>
         <CardContent className="p-8">
-          <div className="flex flex-col md:flex-row gap-12 items-center">
-            <div className="w-full max-w-[200px] aspect-[1/2] bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-200 flex items-center justify-center relative overflow-hidden shadow-inner">
-              <div className="text-slate-200 flex flex-col items-center">
-                <Activity size={64} className="opacity-20" />
-                <span className="text-[10px] font-bold uppercase mt-4 tracking-widest">Cuerpo Humano</span>
-              </div>
-              {/* Mock injury markers */}
-              <div className="absolute top-[25%] left-[45%] w-5 h-5 bg-rose-500/40 rounded-full animate-ping" />
-              <div className="absolute top-[25%] left-[45%] w-5 h-5 bg-rose-500 rounded-full border-2 border-white shadow-lg" />
-              
-              <div className="absolute bottom-[35%] right-[35%] w-5 h-5 bg-orange-500/40 rounded-full animate-ping" />
-              <div className="absolute bottom-[35%] right-[35%] w-5 h-5 bg-orange-500 rounded-full border-2 border-white shadow-lg" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-6">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Escala de Dolor (EVA)</p>
+              {activeRehab.map((item, i) => (
+                <div key={i} className="space-y-2">
+                  <div className="flex justify-between text-xs font-bold">
+                    <span className="text-[#004990]">{item.name}</span>
+                    <span className="text-slate-400">EVA: {item.evaInitial} → {item.evaCurrent}</span>
+                  </div>
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                    <div className="h-full bg-rose-400 opacity-30" style={{ width: `${item.evaInitial * 10}%` }} />
+                    <div className="h-full bg-emerald-500 -ml-[100%] transition-all duration-1000" style={{ width: `${item.evaCurrent * 10}%` }} />
+                  </div>
+                </div>
+              ))}
             </div>
             
-            <div className="flex-1 space-y-6 w-full">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Zonas de Mayor Incidencia</p>
-              {[
-                { zone: 'Lumbar', count: 12, color: 'bg-rose-500' },
-                { zone: 'Rodilla', count: 8, color: 'bg-orange-500' },
-                { zone: 'Hombro', count: 5, color: 'bg-secondary' },
-              ].map((item, i) => (
-                <div key={i} className="space-y-3">
-                  <div className="flex justify-between text-sm font-bold">
-                    <span className="text-[#004990]">{item.zone}</span>
-                    <span className="text-slate-400">{item.count} pacientes</span>
+            <div className="space-y-6">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Arcos de Movilidad</p>
+              {activeRehab.filter(r => r.mobility).map((item, i) => (
+                <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-bold text-[#004990]">{item.mobility?.joint}</span>
+                    <Badge className="bg-secondary text-white border-none text-[9px] font-bold">+{item.mobility!.current - item.mobility!.initial}°</Badge>
                   </div>
-                  <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                    <div className={`h-full ${item.color} rounded-full shadow-sm`} style={{ width: `${(item.count / 15) * 100}%` }} />
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 text-center">
+                      <p className="text-[8px] text-slate-400 uppercase font-bold">Inicial</p>
+                      <p className="text-lg font-bold text-slate-600">{item.mobility?.initial}°</p>
+                    </div>
+                    <ChevronRight className="text-slate-300" size={16} />
+                    <div className="flex-1 text-center">
+                      <p className="text-[8px] text-slate-400 uppercase font-bold">Actual</p>
+                      <p className="text-lg font-bold text-secondary">{item.mobility?.current}°</p>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -79,7 +90,7 @@ export function PhysioWidgets({ patients }: { patients: Patient[] }) {
         <CardHeader className="px-8 pt-8">
           <CardTitle className="text-lg font-bold flex items-center gap-2">
             <RotateCcw size={20} className="text-secondary" />
-            Progreso de Rehabilitación
+            Sesiones de Rehab
           </CardTitle>
         </CardHeader>
         <CardContent className="px-8 pb-8 space-y-8">
@@ -88,7 +99,7 @@ export function PhysioWidgets({ patients }: { patients: Patient[] }) {
               <div className="flex justify-between items-end">
                 <div>
                   <p className="text-sm font-bold">{item.name}</p>
-                  <p className="text-[10px] text-white/60 font-medium">{item.task}</p>
+                  <p className="text-[10px] text-white/60 font-medium truncate max-w-[150px]">{item.task}</p>
                 </div>
                 <p className="text-xs font-bold text-secondary">Sesión {item.session}/{item.total}</p>
               </div>
@@ -99,7 +110,7 @@ export function PhysioWidgets({ patients }: { patients: Patient[] }) {
           )}
           <button className="w-full py-4 bg-secondary hover:bg-secondary/90 text-white rounded-2xl font-bold text-sm shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-4">
             <Dumbbell size={18} />
-            Nueva Rutina de Ejercicios
+            Nueva Rutina
           </button>
         </CardContent>
       </Card>

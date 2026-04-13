@@ -114,6 +114,46 @@ export interface Appointment {
 }
 
 export interface SpecialtyFields {
+  // Psicología
+  hamiltonScore?: number;
+  hamiltonLevel?: 'Leve' | 'Moderado' | 'Severo';
+  beckScore?: number;
+  beckLevel?: 'Leve' | 'Moderado' | 'Severo';
+  
+  // Nutrición
+  dietPlan?: {
+    name: string;
+    macros: { protein: number; carbs: number; fat: number };
+    fileUrl?: string;
+  };
+  
+  // Ortopedia / Fisioterapia
+  rehabPlan?: {
+    diagnosis: string;
+    exercises: string[];
+    sessionsCompleted: number;
+    sessionsTotal: number;
+    evaInitial: number;
+    evaCurrent: number;
+    mobilityDegrees?: { joint: string; initial: number; current: number };
+  };
+  
+  // Ginecología
+  pregnancyTracking?: {
+    weeks: number;
+    fpp: string;
+    fetalWeight: number;
+    deliveryType: 'Vaginal' | 'Cesárea' | 'Por definir';
+  };
+  
+  // Cirugía General
+  surgerySchedule?: {
+    procedure: string;
+    surgeon: string;
+    startTime: string;
+    materialsStatus: 'Completo' | 'Pendiente' | 'En camino';
+  };
+
   [key: string]: any;
 }
 

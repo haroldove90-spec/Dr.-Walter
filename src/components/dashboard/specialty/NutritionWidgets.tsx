@@ -16,6 +16,12 @@ export function NutritionWidgets({ patients }: { patients: Patient[] }) {
   // Mock data for nutrition focus
   const nutritionPatients = patients.filter(p => p.history?.some(h => h.specialty === 'Nutrición'));
 
+  const dietPlans = nutritionPatients
+    .flatMap(p => p.history || [])
+    .filter(h => h.specialty === 'Nutrición' && h.data?.dietPlan)
+    .map(h => h.data!.dietPlan!)
+    .slice(0, 3);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
       <Card className="lg:col-span-2 border-none shadow-sm rounded-[2rem] overflow-hidden">
@@ -44,20 +50,40 @@ export function NutritionWidgets({ patients }: { patients: Patient[] }) {
         <CardHeader className="px-8 pt-8">
           <CardTitle className="text-lg font-bold flex items-center gap-2">
             <Utensils size={20} />
-            Generador de Dietas AI
+            Planes Alimenticios
           </CardTitle>
         </CardHeader>
         <CardContent className="px-8 pb-8 space-y-6">
           <p className="text-white/80 text-sm leading-relaxed">
-            Crea planes alimenticios personalizados basados en el perfil metabólico del paciente.
+            Planes personalizados con distribución de macronutrientes.
           </p>
-          <div className="space-y-3">
-            {['Dieta Hipocalórica', 'Plan Hiperproteico', 'Ayuno Intermitente'].map(plan => (
-              <div key={plan} className="flex items-center justify-between p-3 bg-white/10 rounded-2xl text-xs font-bold hover:bg-white/20 cursor-pointer transition-all group">
-                <span>{plan}</span>
-                <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+          <div className="space-y-4">
+            {dietPlans.length > 0 ? dietPlans.map((plan, idx) => (
+              <div key={idx} className="p-4 bg-white/10 rounded-2xl space-y-3 group hover:bg-white/20 transition-all">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-sm">{plan.name}</span>
+                  <button className="p-2 bg-white/20 rounded-xl hover:bg-white/40 transition-all" title="Descargar Dieta">
+                    <Zap size={14} className="text-white" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-[9px] font-bold uppercase tracking-tighter">
+                  <div className="text-center p-1 bg-white/5 rounded-lg">
+                    <p className="text-white/60">Prot</p>
+                    <p>{plan.macros.protein}%</p>
+                  </div>
+                  <div className="text-center p-1 bg-white/5 rounded-lg">
+                    <p className="text-white/60">Carb</p>
+                    <p>{plan.macros.carbs}%</p>
+                  </div>
+                  <div className="text-center p-1 bg-white/5 rounded-lg">
+                    <p className="text-white/60">Grasa</p>
+                    <p>{plan.macros.fat}%</p>
+                  </div>
+                </div>
               </div>
-            ))}
+            )) : (
+              <p className="text-xs text-white/40 text-center py-4">No hay planes registrados.</p>
+            )}
           </div>
           <button className="w-full py-4 bg-white text-secondary rounded-2xl font-bold text-sm shadow-lg hover:bg-slate-50 transition-all active:scale-[0.98]">
             Nuevo Plan Nutricional

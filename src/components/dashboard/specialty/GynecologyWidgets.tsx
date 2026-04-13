@@ -18,14 +18,17 @@ export function GynecologyWidgets({ patients }: { patients: Patient[] }) {
   const upcomingBirths = gynecologyPatients
     .filter(p => {
       const last = p.history?.filter(h => h.specialty === 'Ginecología').pop();
-      return last?.data?.fpp;
+      return last?.data?.pregnancyTracking;
     })
     .map(p => {
       const last = p.history?.filter(h => h.specialty === 'Ginecología').pop();
+      const tracking = last?.data?.pregnancyTracking;
       return {
         name: `${p.firstName} ${p.lastName}`,
-        date: new Date(last?.data?.fpp).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }),
-        weeks: last?.data?.gesta ? '30+' : 'N/A', // Mocking weeks for now
+        date: new Date(tracking?.fpp).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }),
+        weeks: tracking?.weeks || 'N/A',
+        weight: tracking?.fetalWeight || 0,
+        type: tracking?.deliveryType || 'Por definir',
         status: 'Control'
       };
     })
@@ -37,28 +40,34 @@ export function GynecologyWidgets({ patients }: { patients: Patient[] }) {
         <CardHeader className="px-8 pt-8">
           <CardTitle className="text-lg font-bold text-[#004990] flex items-center gap-2">
             <Baby className="text-secondary" size={20} />
-            Próximos Partos
+            Seguimiento de Embarazo
           </CardTitle>
         </CardHeader>
         <CardContent className="px-8 pb-8 space-y-4">
           {upcomingBirths.length > 0 ? upcomingBirths.map((item, i) => (
-            <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-50 group hover:bg-white hover:shadow-md transition-all">
-              <div>
-                <p className="text-sm font-bold text-[#004990]">{item.name}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <Clock size={12} className="text-secondary" />
-                  <span className="text-[10px] text-slate-500 font-bold">{item.date}</span>
+            <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-50 group hover:bg-white hover:shadow-md transition-all space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold text-[#004990]">{item.name}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Calendar size={12} className="text-secondary" />
+                    <span className="text-[10px] text-slate-500 font-bold">FPP: {item.date}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold text-secondary">{item.weeks} Sem</p>
+                  <Badge className="bg-emerald-100 text-emerald-700 border-none text-[9px] font-bold px-2 py-0.5 rounded-lg">
+                    {item.type}
+                  </Badge>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-xs font-bold text-secondary">{item.weeks} Sem</p>
-                <Badge className="bg-emerald-100 text-emerald-700 border-none text-[9px] font-bold px-2 py-0.5 rounded-lg">
-                  {item.status}
-                </Badge>
+              <div className="pt-2 border-t border-slate-100 flex justify-between items-center">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Peso Fetal Est.</span>
+                <span className="text-xs font-bold text-[#004990]">{item.weight}g</span>
               </div>
             </div>
           )) : (
-            <p className="text-xs text-slate-400 text-center py-8">No hay partos programados.</p>
+            <p className="text-xs text-slate-400 text-center py-8">No hay seguimientos activos.</p>
           )}
         </CardContent>
       </Card>

@@ -19,15 +19,18 @@ export function SurgeryWidgets({ patients }: { patients: Patient[] }) {
   const scheduledSurgeries = surgeryPatients
     .filter(p => {
       const last = p.history?.filter(h => h.specialty === 'Cirugía General').pop();
-      return last?.data?.surgeryStatus === 'Pendiente';
+      return last?.data?.surgerySchedule;
     })
     .map(p => {
       const last = p.history?.filter(h => h.specialty === 'Cirugía General').pop();
+      const schedule = last?.data?.surgerySchedule;
       return {
         name: `${p.firstName} ${p.lastName}`,
-        proc: last?.diagnosis || 'Cirugía Menor',
-        date: last?.data?.surgeryDate || 'Por definir',
+        proc: schedule?.procedure || last?.diagnosis || 'Cirugía Menor',
+        date: schedule?.startTime || 'Por definir',
+        surgeon: schedule?.surgeon || 'Dr. Walter Guidos',
         room: 'Q1',
+        materials: schedule?.materialsStatus || 'Completo',
         status: 'Confirmado'
       };
     })
@@ -61,26 +64,36 @@ export function SurgeryWidgets({ patients }: { patients: Patient[] }) {
               <thead className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
                 <tr>
                   <th className="px-6 py-4 text-left">Paciente</th>
-                  <th className="px-6 py-4 text-left">Procedimiento</th>
-                  <th className="px-6 py-4 text-left">Fecha/Hora</th>
-                  <th className="px-6 py-4 text-left">Quirófano</th>
+                  <th className="px-6 py-4 text-left">Procedimiento / Cirujano</th>
+                  <th className="px-6 py-4 text-left">Hora</th>
+                  <th className="px-6 py-4 text-left">Materiales</th>
                   <th className="px-6 py-4 text-right">Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {scheduledSurgeries.length > 0 ? scheduledSurgeries.map((item, i) => (
                   <tr key={i} className="hover:bg-slate-50/50 transition-colors cursor-pointer group">
-                    <td className="px-6 py-4 font-bold text-[#004990]">{item.name}</td>
-                    <td className="px-6 py-4 text-slate-500 font-medium">{item.proc}</td>
+                    <td className="px-6 py-4">
+                      <p className="font-bold text-[#004990]">{item.name}</p>
+                      <p className="text-[10px] text-slate-400">Q1</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-slate-700 font-bold">{item.proc}</p>
+                      <p className="text-[10px] text-secondary font-medium">{item.surgeon}</p>
+                    </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2 text-slate-400">
                         <Clock size={12} className="text-secondary" />
                         <span className="text-xs font-bold text-slate-600">{item.date}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 font-bold text-secondary">{item.room}</td>
+                    <td className="px-6 py-4">
+                      <Badge variant="outline" className={`text-[9px] font-bold px-2 py-0.5 rounded-lg ${item.materials === 'Completo' ? 'border-emerald-200 text-emerald-600 bg-emerald-50' : 'border-orange-200 text-orange-600 bg-orange-50'}`}>
+                        {item.materials}
+                      </Badge>
+                    </td>
                     <td className="px-6 py-4 text-right">
-                      <Badge variant="outline" className={`text-[9px] font-bold px-2 py-0.5 rounded-lg ${item.status.includes('Confirmado') ? 'border-emerald-200 text-emerald-600 bg-emerald-50' : 'border-orange-200 text-orange-600 bg-orange-50'}`}>
+                      <Badge className="bg-blue-100 text-blue-700 border-none text-[9px] font-bold px-2 py-0.5 rounded-lg">
                         {item.status}
                       </Badge>
                     </td>

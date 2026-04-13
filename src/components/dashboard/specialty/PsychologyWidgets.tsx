@@ -18,18 +18,18 @@ export function PsychologyWidgets({ patients }: { patients: Patient[] }) {
   
   const allRecords = psychologyPatients.flatMap(p => p.history || []).filter(h => h.specialty === 'Psicología');
   
-  const avgAnxiety = allRecords.length > 0 
-    ? Math.round(allRecords.reduce((acc, h) => acc + (h.data?.anxietyScore || 0), 0) / allRecords.length)
+  const avgHamilton = allRecords.length > 0 
+    ? Math.round(allRecords.reduce((acc, h) => acc + (h.data?.hamiltonScore || 0), 0) / allRecords.length)
     : 0;
     
-  const avgDepression = allRecords.length > 0
-    ? Math.round(allRecords.reduce((acc, h) => acc + (h.data?.depressionScore || 0), 0) / allRecords.length)
+  const avgBeck = allRecords.length > 0
+    ? Math.round(allRecords.reduce((acc, h) => acc + (h.data?.beckScore || 0), 0) / allRecords.length)
     : 0;
 
   const criticalCases = psychologyPatients
     .filter(p => {
       const last = p.history?.filter(h => h.specialty === 'Psicología').pop();
-      return (last?.data?.anxietyScore || 0) > 10 || (last?.data?.depressionScore || 0) > 10;
+      return (last?.data?.hamiltonScore || 0) > 20 || (last?.data?.beckScore || 0) > 20;
     })
     .slice(0, 3);
 
@@ -58,22 +58,22 @@ export function PsychologyWidgets({ patients }: { patients: Patient[] }) {
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="p-6 bg-white border border-slate-100 rounded-3xl hover:border-secondary/30 cursor-pointer transition-all shadow-sm group">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Escala Ansiedad (GAD-7)</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Escala Hamilton (Ansiedad)</p>
                 <Activity size={16} className="text-secondary group-hover:scale-110 transition-transform" />
               </div>
-              <p className="text-3xl font-bold text-[#004990]">{avgAnxiety} <span className="text-xs font-medium text-slate-400">Promedio</span></p>
-              <Badge className={`mt-3 border-none rounded-lg px-2 py-0.5 text-[10px] ${avgAnxiety > 10 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                {avgAnxiety > 10 ? 'Moderada' : 'Leve'}
+              <p className="text-3xl font-bold text-[#004990]">{avgHamilton} <span className="text-xs font-medium text-slate-400">Promedio</span></p>
+              <Badge className={`mt-3 border-none rounded-lg px-2 py-0.5 text-[10px] ${avgHamilton > 17 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                {avgHamilton > 24 ? 'Severa' : avgHamilton > 17 ? 'Moderada' : 'Leve'}
               </Badge>
             </div>
             <div className="p-6 bg-white border border-slate-100 rounded-3xl hover:border-secondary/30 cursor-pointer transition-all shadow-sm group">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Escala Depresión (PHQ-9)</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Test de Beck (Depresión)</p>
                 <Brain size={16} className="text-secondary group-hover:scale-110 transition-transform" />
               </div>
-              <p className="text-3xl font-bold text-[#004990]">{avgDepression} <span className="text-xs font-medium text-slate-400">Promedio</span></p>
-              <Badge className={`mt-3 border-none rounded-lg px-2 py-0.5 text-[10px] ${avgDepression > 10 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                {avgDepression > 10 ? 'Moderada' : 'Leve'}
+              <p className="text-3xl font-bold text-[#004990]">{avgBeck} <span className="text-xs font-medium text-slate-400">Promedio</span></p>
+              <Badge className={`mt-3 border-none rounded-lg px-2 py-0.5 text-[10px] ${avgBeck > 18 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                {avgBeck > 29 ? 'Severa' : avgBeck > 18 ? 'Moderada' : 'Leve'}
               </Badge>
             </div>
           </div>
