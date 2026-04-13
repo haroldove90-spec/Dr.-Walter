@@ -391,15 +391,17 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-[#F5F7FB] font-sans text-[#1A1A1A] overflow-hidden">
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        doctor={currentDoctor} 
-        viewingSpecialty={viewingSpecialty}
-        onSpecialtyChange={setViewingSpecialty}
-        onInstall={handleInstall}
-        deferredPrompt={deferredPrompt}
-      />
+      {activeTab !== 'home' && (
+        <Sidebar 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          doctor={currentDoctor} 
+          viewingSpecialty={viewingSpecialty}
+          onSpecialtyChange={setViewingSpecialty}
+          onInstall={handleInstall}
+          deferredPrompt={deferredPrompt}
+        />
+      )}
       
       <main className="flex-1 overflow-y-auto relative">
         {/* Toast Notification */}
@@ -424,56 +426,58 @@ export default function App() {
         )}
 
         {/* Top Header Bar - Updated with Mobile Styling */}
-        <header className="sticky top-0 z-30 bg-[#004990] md:bg-[#F5F7FB]/80 md:backdrop-blur-md px-4 md:px-8 py-4 md:py-6 flex items-center justify-between shadow-lg md:shadow-none">
-          <div className="flex items-center gap-4">
-            <div className="relative hidden md:block">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <Input 
-                placeholder="Buscar pacientes, citas..." 
-                className="pl-10 w-[300px] bg-white border-none shadow-sm rounded-2xl h-11 focus-visible:ring-secondary"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            {/* Mobile Logo/Title */}
-            <div className="md:hidden flex items-center gap-2">
-              <div className="w-8 h-8 bg-white/10 rounded-xl flex items-center justify-center text-white">
-                <Stethoscope size={18} className="text-secondary" />
+        {activeTab !== 'home' && (
+          <header className="sticky top-0 z-30 bg-[#004990] md:bg-[#F5F7FB]/80 md:backdrop-blur-md px-4 md:px-8 py-4 md:py-6 flex items-center justify-between shadow-lg md:shadow-none">
+            <div className="flex items-center gap-4">
+              <div className="relative hidden md:block">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <Input 
+                  placeholder="Buscar pacientes, citas..." 
+                  className="pl-10 w-[300px] bg-white border-none shadow-sm rounded-2xl h-11 focus-visible:ring-secondary"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
               </div>
-              <h1 className="font-bold text-white text-sm">Clínica Guidos</h1>
+              {/* Mobile Logo/Title */}
+              <div className="md:hidden flex items-center gap-2">
+                <div className="w-8 h-8 bg-white/10 rounded-xl flex items-center justify-center text-white">
+                  <Stethoscope size={18} className="text-secondary" />
+                </div>
+                <h1 className="font-bold text-white text-sm">Clínica Guidos</h1>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2 md:gap-4">
-            {viewingSpecialty !== 'Global' && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setViewingSpecialty('Global')}
-                className="hidden md:flex items-center gap-2 text-[#004990] hover:bg-blue-50 rounded-xl font-bold text-xs"
-              >
-                <LayoutGrid size={16} />
-                Panel Central
+            <div className="flex items-center gap-2 md:gap-4">
+              {viewingSpecialty !== 'Global' && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setViewingSpecialty('Global')}
+                  className="hidden md:flex items-center gap-2 text-[#004990] hover:bg-blue-50 rounded-xl font-bold text-xs"
+                >
+                  <LayoutGrid size={16} />
+                  Panel Central
+                </Button>
+              )}
+              <Button variant="ghost" size="icon" className="rounded-2xl bg-white/10 md:bg-white shadow-sm text-white md:text-slate-400 hover:text-secondary">
+                <Bell size={20} />
               </Button>
-            )}
-            <Button variant="ghost" size="icon" className="rounded-2xl bg-white/10 md:bg-white shadow-sm text-white md:text-slate-400 hover:text-secondary">
-              <Bell size={20} />
-            </Button>
-            <div className="h-8 w-[1px] bg-white/10 md:bg-slate-200 mx-1 md:mx-2" />
-            <div className="flex items-center gap-2 md:gap-3 cursor-pointer" onClick={() => setActiveTab('profile')}>
-              <div className="text-right hidden md:block">
-                <p className="text-sm font-bold text-slate-900">Dr. {currentDoctor.lastName}</p>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{viewingSpecialty}</p>
-              </div>
-              <div className="w-9 h-9 md:w-11 md:h-11 rounded-xl md:rounded-2xl bg-secondary flex items-center justify-center text-white font-bold shadow-lg shadow-secondary/20 overflow-hidden">
-                {currentDoctor.photoUrl ? (
-                  <img src={currentDoctor.photoUrl} alt="Dr" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  `${currentDoctor.firstName[0]}${currentDoctor.lastName[0]}`
-                )}
+              <div className="h-8 w-[1px] bg-white/10 md:bg-slate-200 mx-1 md:mx-2" />
+              <div className="flex items-center gap-2 md:gap-3 cursor-pointer" onClick={() => setActiveTab('profile')}>
+                <div className="text-right hidden md:block">
+                  <p className="text-sm font-bold text-slate-900">Dr. {currentDoctor.lastName}</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{viewingSpecialty}</p>
+                </div>
+                <div className="w-9 h-9 md:w-11 md:h-11 rounded-xl md:rounded-2xl bg-secondary flex items-center justify-center text-white font-bold shadow-lg shadow-secondary/20 overflow-hidden">
+                  {currentDoctor.photoUrl ? (
+                    <img src={currentDoctor.photoUrl} alt="Dr" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    `${currentDoctor.firstName[0]}${currentDoctor.lastName[0]}`
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         <div className="p-4 md:p-8">
           {isPrescriptionModalOpen && selectedPatientForPrescription && (
