@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Patient, Appointment, Doctor, Specialty } from '@/src/types';
 
 import { 
+  Home,
   LayoutDashboard, 
   Users, 
   Calendar, 
@@ -23,14 +24,17 @@ import {
   Scissors,
   User,
   Smartphone,
-  Download
+  Download,
+  Pill
 } from 'lucide-react';
 
 const navItems = [
+  { icon: Home, label: 'Inicio', id: 'home' },
   { icon: LayoutDashboard, label: 'Dashboard', id: 'dashboard' },
   { icon: Calendar, label: 'Agenda', id: 'agenda' },
   { icon: Users, label: 'Pacientes', id: 'patients' },
   { icon: ClipboardList, label: 'Consultas', id: 'consultations' },
+  { icon: Pill, label: 'Recetas', id: 'prescriptions' },
   { icon: Utensils, label: 'Dietas', id: 'diets', specialties: ['Nutrición'] },
   { icon: Brain, label: 'Escalas', id: 'scales', specialties: ['Psicología'] },
   { icon: Baby, label: 'Partos', id: 'births', specialties: ['Ginecología'] },
@@ -120,6 +124,9 @@ export function Sidebar({ activeTab, setActiveTab, doctor, viewingSpecialty, onS
               onClick={() => {
                 setActiveTab(item.id);
                 setIsMobileMenuOpen(false);
+                if (item.specialties && item.specialties.length > 0) {
+                  onSpecialtyChange?.(item.specialties[0] as Specialty);
+                }
               }}
               className={cn(
                 "w-full flex items-center gap-3 p-3 rounded-2xl transition-all duration-300 group relative",

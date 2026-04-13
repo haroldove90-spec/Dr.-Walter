@@ -55,6 +55,9 @@ import { DashboardChart } from './components/dashboard/DashboardChart';
 import { AdminView } from './components/dashboard/AdminView';
 import { QuickAccess } from './components/dashboard/QuickAccess';
 import { PrescriptionForm } from './components/consultation/PrescriptionForm';
+import { PrescriptionsList } from './components/dashboard/PrescriptionsList';
+import { HomeView } from './components/dashboard/HomeView';
+import { PWAInstallBanner } from './components/layout/PWAInstallBanner';
 import { exportPrescriptionToPDF, sharePrescription } from './lib/exportUtils';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Pill } from 'lucide-react';
@@ -76,7 +79,10 @@ export default function App() {
     localStorage.setItem('currentDoctor', JSON.stringify(defaultDoctor));
     return defaultDoctor;
   });
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(() => {
+    const saved = localStorage.getItem('activeTab');
+    return saved || 'home';
+  });
   const [inConsultation, setInConsultation] = useState<Appointment | null>(null);
   const [viewingExpediente, setViewingExpediente] = useState<Patient | null>(null);
   const [patients, setPatients] = useState<Patient[]>(() => {
@@ -136,6 +142,7 @@ export default function App() {
     };
   });
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
   const notifiedAppointments = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -172,7 +179,11 @@ export default function App() {
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setToast({ message: '¿Deseas instalar Clínica Guidos en tu pantalla de inicio?', type: 'success' });
+      // Only show banner if user hasn't dismissed it in this session
+      const dismissed = sessionStorage.getItem('pwa-banner-dismissed');
+      if (!dismissed) {
+        setShowInstallBanner(true);
+      }
     });
 
     if ('serviceWorker' in navigator) {
@@ -186,8 +197,14 @@ export default function App() {
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') {
         setDeferredPrompt(null);
+        setShowInstallBanner(false);
       }
     }
+  };
+
+  const handleDismissInstall = () => {
+    setShowInstallBanner(false);
+    sessionStorage.setItem('pwa-banner-dismissed', 'true');
   };
 
   const handleResetDemo = () => {
@@ -204,18 +221,26 @@ export default function App() {
   };
 
   useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
     localStorage.setItem('viewingSpecialty', viewingSpecialty);
   }, [viewingSpecialty]);
 
   useEffect(() => {
     if (currentDoctor) {
       localStorage.setItem('currentDoctor', JSON.stringify(currentDoctor));
-      // Initialize with mock data if empty
-      if (patients.length === 0) {
+      
+      // Force load mock data if current data is empty or seems to be the old version
+      const savedPatients = localStorage.getItem('patients');
+      const parsedPatients = savedPatients ? JSON.parse(savedPatients) : [];
+      
+      if (parsedPatients.length === 0 || !parsedPatients.some((p: any) => p.history?.some((h: any) => h.data?.hamiltonScore))) {
+        console.log('Cargando datos de muestra enriquecidos...');
         setPatients(MOCK_PATIENTS);
         localStorage.setItem('patients', JSON.stringify(MOCK_PATIENTS));
-      }
-      if (appointments.length === 0) {
+        
         setAppointments(MOCK_APPOINTMENTS);
         localStorage.setItem('appointments', JSON.stringify(MOCK_APPOINTMENTS));
       }
@@ -390,6 +415,14 @@ export default function App() {
           </div>
         )}
 
+        {/* PWA Install Banner */}
+        {showInstallBanner && (
+          <PWAInstallBanner 
+            onInstall={handleInstall} 
+            onClose={handleDismissInstall} 
+          />
+        )}
+
         {/* Top Header Bar - Updated with Mobile Styling */}
         <header className="sticky top-0 z-30 bg-[#004990] md:bg-[#F5F7FB]/80 md:backdrop-blur-md px-4 md:px-8 py-4 md:py-6 flex items-center justify-between shadow-lg md:shadow-none">
           <div className="flex items-center gap-4">
@@ -505,6 +538,17 @@ export default function App() {
             />
           ) : (
             <div className="space-y-8 animate-in fade-in duration-500">
+              {activeTab === 'home' && (
+                <HomeView 
+                  onSelectSpecialty={(spec) => {
+                    setViewingSpecialty(spec);
+                    setActiveTab('dashboard');
+                  }}
+                  currentSpecialty={viewingSpecialty as Specialty}
+                  doctorName={currentDoctor.firstName}
+                />
+              )}
+
               {activeTab === 'dashboard' && (
                 <>
                   {/* Welcome Section */}
@@ -561,9 +605,11 @@ export default function App() {
                       </div>
 
                       {/* Specialty Specific Widgets */}
-                      <div className="mb-8">
-                        <QuickAccess onSelect={setViewingSpecialty} currentSpecialty={viewingSpecialty} />
-                      </div>
+                      {currentDoctor.role !== 'admin' && (
+                        <div className="mb-8">
+                          <QuickAccess onSelect={setViewingSpecialty} currentSpecialty={viewingSpecialty} />
+                        </div>
+                      )}
 
                       <div className="grid grid-cols-12 gap-8">
                         {/* Left Column: Charts and Schedule */}
@@ -737,6 +783,13 @@ export default function App() {
                   )}
                 </>
               )}
+
+              {activeTab === 'scales' && <PsychologyWidgets patients={patients} />}
+              {activeTab === 'diets' && <NutritionWidgets patients={patients} />}
+              {activeTab === 'births' && <GynecologyWidgets patients={patients} />}
+              {activeTab === 'rehab' && <PhysioWidgets patients={patients} />}
+              {activeTab === 'surgery' && <SurgeryWidgets patients={patients} />}
+              {activeTab === 'prescriptions' && <PrescriptionsList patients={patients} />}
 
               {activeTab === 'agenda' && (
                 <CalendarView 
