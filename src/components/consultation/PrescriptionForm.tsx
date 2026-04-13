@@ -36,7 +36,9 @@ export function PrescriptionForm({ patient, doctor, specialty, onSave, onExport,
     setItems(newItems);
   };
 
-  const handleAction = (type: 'save' | 'export' | 'share') => {
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleAction = async (type: 'save' | 'export' | 'share') => {
     const prescription: Prescription = {
       id: `rx-${Date.now()}`,
       patientId: patient.id,
@@ -52,7 +54,14 @@ export function PrescriptionForm({ patient, doctor, specialty, onSave, onExport,
     }
 
     if (type === 'save') onSave(prescription);
-    if (type === 'export') onExport(prescription);
+    if (type === 'export') {
+      setIsExporting(true);
+      try {
+        await onExport(prescription);
+      } finally {
+        setIsExporting(false);
+      }
+    }
     if (type === 'share') onShare(prescription);
   };
 
@@ -161,10 +170,15 @@ export function PrescriptionForm({ patient, doctor, specialty, onSave, onExport,
             <Button 
               variant="outline"
               onClick={() => handleAction('export')}
+              disabled={isExporting}
               className="flex-1 rounded-2xl border-slate-200 text-slate-600 font-bold h-12 gap-2"
             >
-              <Download size={18} />
-              PDF
+              {isExporting ? (
+                <div className="w-5 h-5 border-2 border-slate-300 border-t-secondary rounded-full animate-spin" />
+              ) : (
+                <Download size={18} />
+              )}
+              {isExporting ? 'Generando...' : 'PDF'}
             </Button>
             <Button 
               variant="outline"

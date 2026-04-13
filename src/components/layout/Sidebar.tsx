@@ -31,7 +31,6 @@ const navItems = [
   { icon: Calendar, label: 'Agenda', id: 'agenda' },
   { icon: Users, label: 'Pacientes', id: 'patients' },
   { icon: ClipboardList, label: 'Consultas', id: 'consultations' },
-  { icon: User, label: 'Mi Perfil', id: 'profile' },
   { icon: Utensils, label: 'Dietas', id: 'diets', specialties: ['Nutrición'] },
   { icon: Brain, label: 'Escalas', id: 'scales', specialties: ['Psicología'] },
   { icon: Baby, label: 'Partos', id: 'births', specialties: ['Ginecología'] },
@@ -152,7 +151,7 @@ export function Sidebar({ activeTab, setActiveTab, doctor, viewingSpecialty, onS
           {!isCollapsed ? (
             <div 
               className="flex items-center gap-4 p-4 bg-white/5 rounded-[1.5rem] border border-white/5 backdrop-blur-sm mb-4 cursor-pointer hover:bg-white/10 transition-all"
-              onClick={() => setActiveTab('profile')}
+              onClick={() => setActiveTab('settings')}
             >
               <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center text-base font-bold text-white shadow-lg shadow-secondary/20 shrink-0 overflow-hidden">
                 {doctor.photoUrl ? (
@@ -169,7 +168,7 @@ export function Sidebar({ activeTab, setActiveTab, doctor, viewingSpecialty, onS
           ) : (
             <div 
               className="flex justify-center mb-6 cursor-pointer hover:scale-105 transition-all"
-              onClick={() => setActiveTab('profile')}
+              onClick={() => setActiveTab('settings')}
             >
               <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center text-base font-bold text-white shadow-lg shadow-secondary/20 overflow-hidden">
                 {doctor.photoUrl ? (

@@ -175,96 +175,133 @@ export const exportConsultationToPDF = (patient: Patient, appointment: Appointme
   doc.save(`ClinicaGuidos_${appointment.specialty}_${patient.lastName}.pdf`);
 };
 
-export const exportPrescriptionToPDF = (patient: Patient, prescription: Prescription, doctor?: any) => {
+export const exportPrescriptionToPDF = async (patient: Patient, prescription: Prescription, doctor?: any) => {
   const doc = new jsPDF();
   
-  // Professional Header
+  // Professional Header / Letterhead
   doc.setFillColor(0, 73, 144); // Primary Blue
-  doc.rect(0, 0, 210, 40, 'F');
+  doc.rect(0, 0, 210, 45, 'F');
   
-  doc.setFontSize(24);
+  // Logo Placeholder (Circle)
+  doc.setFillColor(255, 255, 255, 0.2);
+  doc.circle(35, 22, 15, 'F');
   doc.setTextColor(255, 255, 255);
+  doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
-  doc.text('CLÍNICA GUIDOS', 20, 25);
+  doc.text('G', 32, 25);
+
+  doc.setFontSize(24);
+  doc.text('CLÍNICA GUIDOS', 55, 22);
   
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
+  doc.text('Excelencia Médica y Cuidado Integral', 55, 28);
+  doc.text('Calle Médica #123, San Salvador, El Salvador', 55, 33);
+  doc.text('Tel: +503 2222-0000 | info@clinicaguidos.com', 55, 38);
+
+  // Doctor Info (Right Aligned)
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
   doc.text(`Dr. ${doctor?.firstName || 'Walter'} ${doctor?.lastName || 'Guidos'}`, 140, 15);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
   doc.text(doctor?.specialty || 'Director Médico', 140, 20);
-  doc.text(doctor?.university || 'Calle Médica #123, San Salvador', 140, 25);
-  doc.text(`JVPM: ${doctor?.licenseNumber || '2222-0000'}`, 140, 30);
+  doc.text(`Cédula Prof: ${doctor?.licenseNumber || 'JVPM 2222-0000'}`, 140, 25);
+  doc.text(doctor?.university || 'Universidad de El Salvador', 140, 30);
   
   // Prescription Banner
   doc.setFillColor(0, 209, 178); // Secondary Teal
-  doc.rect(0, 40, 210, 10, 'F');
+  doc.rect(0, 45, 210, 10, 'F');
   
   doc.setFontSize(12);
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.text('RECETA MÉDICA', 105, 47, { align: 'center' });
+  doc.text('RECETA MÉDICA / PRESCRIPCIÓN', 105, 52, { align: 'center' });
   
-  // Patient Info
+  // Patient Info Section
   doc.setTextColor(0, 73, 144);
   doc.setFontSize(14);
-  doc.text('DATOS DEL PACIENTE', 20, 65);
+  doc.text('DATOS DEL PACIENTE', 20, 70);
   
   doc.setDrawColor(0, 73, 144);
   doc.setLineWidth(0.5);
-  doc.line(20, 67, 190, 67);
+  doc.line(20, 72, 190, 72);
   
   doc.setFontSize(10);
   doc.setTextColor(50);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Nombre: ${patient.firstName} ${patient.lastName}`, 20, 75);
-  doc.text(`Fecha: ${new Date(prescription.date).toLocaleDateString()}`, 140, 75);
-  doc.text(`Edad: ${new Date().getFullYear() - new Date(patient.dob).getFullYear()} años`, 20, 82);
-  doc.text(`Especialidad: ${prescription.specialty}`, 140, 82);
+  
+  const age = new Date().getFullYear() - new Date(patient.dob).getFullYear();
+  
+  doc.text(`Nombre: ${patient.firstName} ${patient.lastName}`, 20, 80);
+  doc.text(`Edad: ${age} años`, 20, 87);
+  doc.text(`Género: ${patient.gender}`, 20, 94);
+  
+  doc.text(`Fecha: ${new Date(prescription.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}`, 130, 80);
+  doc.text(`Especialidad: ${prescription.specialty}`, 130, 87);
+  doc.text(`ID Paciente: #2024-${patient.id.slice(-4)}`, 130, 94);
 
   // Rx Symbol
   doc.setFontSize(40);
   doc.setTextColor(0, 73, 144);
   doc.setFont('helvetica', 'bold');
-  doc.text('Rx', 20, 105);
+  doc.text('Rx', 20, 115);
 
-  // Prescription Items
+  // Prescription Items Table
   const tableData = prescription.items.map(item => [
-    `${item.medication}\n${item.dosage}`,
+    { content: `${item.medication}\n${item.dosage}`, styles: { fontStyle: 'bold' } },
     item.frequency,
     item.duration,
     item.instructions || '-'
   ]);
 
   doc.autoTable({
-    startY: 115,
+    startY: 125,
     head: [['Medicamento / Dosis', 'Frecuencia', 'Duración', 'Indicaciones']],
     body: tableData,
     theme: 'striped',
-    headStyles: { fill: [0, 73, 144], textColor: 255 },
-    styles: { fontSize: 10, cellPadding: 5 },
+    headStyles: { fill: [0, 73, 144], textColor: 255, fontStyle: 'bold' },
+    styles: { fontSize: 10, cellPadding: 6, valign: 'middle' },
     columnStyles: { 
-      0: { fontStyle: 'bold', width: 60 },
-      3: { width: 60 }
+      0: { width: 60 },
+      1: { width: 35 },
+      2: { width: 30 },
+      3: { width: 45 }
     }
   });
 
-  // Footer / Signature
-  const finalY = (doc as any).lastAutoTable.finalY + 30;
+  // Footer / Signature Area
+  const finalY = (doc as any).lastAutoTable.finalY + 40;
   
+  // Check for signature
   if (doctor?.signatureUrl) {
-    doc.addImage(doctor.signatureUrl, 'PNG', 85, finalY - 25, 40, 20);
+    try {
+      doc.addImage(doctor.signatureUrl, 'PNG', 85, finalY - 35, 40, 20);
+    } catch (e) {
+      console.error('Error adding signature to PDF:', e);
+    }
   }
+  
+  doc.setDrawColor(200);
   doc.line(70, finalY, 140, finalY);
   doc.setFontSize(10);
   doc.setTextColor(0);
-  doc.text(`Dr. ${doctor?.firstName || 'Walter'} ${doctor?.lastName || 'Guidos'}`, 105, finalY + 5, { align: 'center' });
-  doc.text('Sello y Firma Autorizada', 105, finalY + 10, { align: 'center' });
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Dr. ${doctor?.firstName || 'Walter'} ${doctor?.lastName || 'Guidos'}`, 105, finalY + 7, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text(doctor?.specialty || 'Médico Especialista', 105, finalY + 12, { align: 'center' });
+  doc.text(`JVPM: ${doctor?.licenseNumber || '2222-0000'}`, 105, finalY + 16, { align: 'center' });
+  doc.text('Sello y Firma Autorizada', 105, finalY + 22, { align: 'center' });
 
-  // Disclaimer
+  // Bottom Disclaimer
   doc.setFontSize(8);
   doc.setTextColor(150);
   doc.text('Esta receta tiene una validez de 30 días a partir de su fecha de emisión.', 105, 285, { align: 'center' });
+  doc.text('Clínica Guidos - Sistema de Gestión Médica Digital', 105, 290, { align: 'center' });
 
-  const fileName = `Receta_${patient.lastName}_${new Date().getTime()}.pdf`;
+  const dateStr = new Date().toLocaleDateString('es-ES').replace(/\//g, '-');
+  const fileName = `Receta_${patient.firstName}_${patient.lastName}_${dateStr}.pdf`;
   doc.save(fileName);
   return doc;
 };

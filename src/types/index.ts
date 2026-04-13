@@ -116,3 +116,21 @@ export interface Appointment {
 export interface SpecialtyFields {
   [key: string]: any;
 }
+
+export interface ClinicConfig {
+  notifications: {
+    agendaAlerts: number;
+    autoReminders: boolean;
+    followUpAlerts: boolean;
+  };
+  workflow: {
+    consultationDuration: Record<Specialty, number>;
+    workingDays: number[];
+    openingHour: string;
+    closingHour: string;
+  };
+  preferences: {
+    language: 'es' | 'en';
+    theme: 'light' | 'dark';
+  };
+}

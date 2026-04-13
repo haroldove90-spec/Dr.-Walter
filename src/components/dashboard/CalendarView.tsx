@@ -13,7 +13,7 @@ import {
   Calendar as CalendarIcon,
   ClipboardList
 } from 'lucide-react';
-import { Appointment, Patient, Specialty } from '@/src/types';
+import { Appointment, Patient, Specialty, ClinicConfig } from '@/src/types';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -22,12 +22,20 @@ interface CalendarViewProps {
   patients: Patient[];
   viewingSpecialty: Specialty;
   highlightedAppointmentId?: string | null;
+  config: ClinicConfig;
 }
 
-export function CalendarView({ appointments, patients, viewingSpecialty, highlightedAppointmentId }: CalendarViewProps) {
+export function CalendarView({ appointments, patients, viewingSpecialty, highlightedAppointmentId, config }: CalendarViewProps) {
   const [selectedApt, setSelectedApt] = useState<Appointment | null>(null);
-  const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-  const hours = Array.from({ length: 10 }, (_, i) => `${i + 8}:00`);
+  const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  
+  // Generate hours based on config
+  const startHour = parseInt(config.workflow.openingHour.split(':')[0]);
+  const endHour = parseInt(config.workflow.closingHour.split(':')[0]);
+  const hours = Array.from({ length: endHour - startHour + 1 }, (_, i) => {
+    const h = i + startHour;
+    return `${h < 10 ? '0' : ''}${h}:00`;
+  });
 
   const getAppointmentForSlot = (dayIndex: number, hour: string) => {
     // This is a simplified mock calendar logic
@@ -67,7 +75,13 @@ export function CalendarView({ appointments, patients, viewingSpecialty, highlig
           <div className="grid grid-cols-8 border-b border-slate-50">
             <div className="p-4 bg-slate-50/50 border-r border-slate-50" />
             {days.map((day, i) => (
-              <div key={day} className="p-4 text-center border-r border-slate-50 last:border-r-0 bg-slate-50/50">
+              <div 
+                key={day} 
+                className={cn(
+                  "p-4 text-center border-r border-slate-50 last:border-r-0 bg-slate-50/50",
+                  !config.workflow.workingDays.includes(i) && "opacity-40 grayscale"
+                )}
+              >
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{day}</p>
                 <p className="text-sm font-bold text-[#004990] mt-1">{15 + i}</p>
               </div>
@@ -81,11 +95,18 @@ export function CalendarView({ appointments, patients, viewingSpecialty, highlig
                   <span className="text-[10px] font-bold text-slate-400">{hour}</span>
                 </div>
                 {days.map((_, i) => {
-                  const apt = getAppointmentForSlot(i, hour);
+                  const isWorkingDay = config.workflow.workingDays.includes(i);
+                  const apt = isWorkingDay ? getAppointmentForSlot(i, hour) : null;
                   const patient = apt ? patients.find(p => p.id === apt.patientId) : null;
                   
                   return (
-                    <div key={i} className="p-2 border-r border-slate-50 last:border-r-0 min-h-[80px] relative group-hover:bg-slate-50/30 transition-colors">
+                    <div 
+                      key={i} 
+                      className={cn(
+                        "p-2 border-r border-slate-50 last:border-r-0 min-h-[80px] relative group-hover:bg-slate-50/30 transition-colors",
+                        !isWorkingDay && "bg-slate-100/30 pattern-diagonal-lines"
+                      )}
+                    >
                       {apt && patient && (
                         <div 
                           onClick={() => setSelectedApt(apt)}
@@ -137,7 +158,7 @@ export function CalendarView({ appointments, patients, viewingSpecialty, highlig
             </div>
             <div>
               <p className="text-xs font-bold opacity-80 uppercase tracking-wider">Tiempo Promedio</p>
-              <p className="text-2xl font-bold">25 min</p>
+              <p className="text-2xl font-bold">{config.workflow.consultationDuration[viewingSpecialty]} min</p>
             </div>
           </div>
         </Card>

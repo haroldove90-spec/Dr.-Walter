@@ -27,6 +27,8 @@ import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Pill, Share2 } from 'lucide-react';
 
+import { Textarea } from '@/components/ui/textarea';
+
 interface ConsultationViewProps {
   patient: Patient;
   appointment: Appointment;
@@ -34,9 +36,10 @@ interface ConsultationViewProps {
   onBack: () => void;
   onSave: (record: any) => void;
   onSavePrescription?: (prescription: Prescription) => void;
+  setToast?: (toast: { message: string; type: 'success' | 'error' } | null) => void;
 }
 
-export function ConsultationView({ patient, appointment, doctor, onBack, onSave, onSavePrescription }: ConsultationViewProps) {
+export function ConsultationView({ patient, appointment, doctor, onBack, onSave, onSavePrescription, setToast }: ConsultationViewProps) {
   const [selectedSpecialty, setSelectedSpecialty] = useState<Specialty>(appointment.specialty);
   const [activeView, setActiveView] = useState<'consultation' | 'prescription'>('consultation');
   const [isSaving, setIsSaving] = useState(false);
@@ -59,7 +62,7 @@ export function ConsultationView({ patient, appointment, doctor, onBack, onSave,
 
   const handleSave = () => {
     if (!diagnosis || !treatmentPlan) {
-      alert('Por favor complete el diagnóstico y el plan de tratamiento.');
+      setToast?.({ message: 'Por favor complete el diagnóstico y el plan de tratamiento.', type: 'error' });
       return;
     }
     setIsSaving(true);
@@ -335,7 +338,7 @@ export function ConsultationView({ patient, appointment, doctor, onBack, onSave,
                     <label className="text-xs font-medium text-zinc-500 flex items-center gap-1">
                       Plan de Tratamiento / Receta <span className="text-red-500">*</span>
                     </label>
-                    <textarea 
+                    <Textarea 
                       className="w-full min-h-[120px] p-3 rounded-md border border-zinc-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
                       placeholder="Indique medicamentos, dosis y duración..." 
                       value={treatmentPlan}
@@ -352,7 +355,7 @@ export function ConsultationView({ patient, appointment, doctor, onBack, onSave,
               specialty={selectedSpecialty}
               onSave={(rx) => {
                 onSavePrescription?.(rx);
-                alert('Receta guardada en el expediente.');
+                setToast?.({ message: 'Receta guardada en el expediente.', type: 'success' });
               }}
               onExport={(rx) => exportPrescriptionToPDF(patient, rx, doctor)}
               onShare={(rx) => sharePrescription(patient, rx)}

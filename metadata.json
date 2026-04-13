@@ -1,6 +1,6 @@
 {
   "name": "Dr. Walter Guidos",
-  "description": "Sistema integral de gestión médica con expedientes dinámicos por especialidad (Psicología, Nutrición, Ortopedia, Ginecología, Fisioterapia y Cirugía).",
+  "description": "Plataforma integral de gestión médica para la Clínica Guidos. Control de expedientes, recetas digitales con firma táctil y panel multi-especialidad.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

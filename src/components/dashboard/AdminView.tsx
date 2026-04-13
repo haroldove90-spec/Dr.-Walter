@@ -11,6 +11,7 @@ import {
   UserCheck,
   UserMinus
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 
@@ -157,6 +158,4 @@ export function AdminView() {
   );
 }
 
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(' ');
-}
+

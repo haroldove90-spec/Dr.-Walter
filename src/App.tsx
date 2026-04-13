@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sidebar } from './components/layout/Sidebar';
 import { StatCard } from './components/dashboard/StatCard';
 import { ConsultationView } from './components/consultation/ConsultationView';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { DoctorOnboarding } from './components/auth/DoctorOnboarding';
 import { cn } from '@/lib/utils';
+import { EspecialidadesGrid } from './components/dashboard/EspecialidadesGrid';
 import { 
   Users, 
   Calendar, 
@@ -24,7 +25,8 @@ import {
   Clock,
   Stethoscope,
   ArrowLeft,
-  CheckCircle2
+  CheckCircle2,
+  LayoutGrid
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -38,7 +40,7 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { Patient, Appointment, Doctor, Specialty } from '@/src/types';
+import { Patient, Appointment, Doctor, Specialty, Prescription, ClinicConfig } from '@/src/types';
 import { exportToExcel } from './lib/exportUtils';
 import { MOCK_PATIENTS, MOCK_APPOINTMENTS } from './lib/mockData';
 import { NutritionWidgets } from './components/dashboard/specialty/NutritionWidgets';
@@ -49,15 +51,14 @@ import { SurgeryWidgets } from './components/dashboard/specialty/SurgeryWidgets'
 import { SPECIALTY_COLORS } from './types';
 import { PatientForm } from './components/dashboard/PatientForm';
 import { CalendarView } from './components/dashboard/CalendarView';
-import { ProfilePage } from './components/dashboard/ProfilePage';
 import { DashboardChart } from './components/dashboard/DashboardChart';
 import { AdminView } from './components/dashboard/AdminView';
 import { QuickAccess } from './components/dashboard/QuickAccess';
 import { PrescriptionForm } from './components/consultation/PrescriptionForm';
 import { exportPrescriptionToPDF, sharePrescription } from './lib/exportUtils';
-import { Prescription } from './types';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Pill } from 'lucide-react';
+import { SettingsPage } from './components/dashboard/SettingsPage';
 
 export default function App() {
   const [currentDoctor, setCurrentDoctor] = useState<Doctor | null>(() => {
@@ -87,16 +88,10 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewingSpecialty, setViewingSpecialty] = useState<Specialty>(() => {
+  const [viewingSpecialty, setViewingSpecialty] = useState<Specialty | 'Global'>(() => {
     const saved = localStorage.getItem('viewingSpecialty');
-    if (saved) return saved as Specialty;
-    
-    const docSaved = localStorage.getItem('currentDoctor');
-    if (docSaved) {
-      const doc = JSON.parse(docSaved);
-      return doc.specialty;
-    }
-    return 'Médico General';
+    if (saved) return saved as Specialty | 'Global';
+    return 'Global';
   });
 
   // New state for CRUD and Navigation
@@ -110,12 +105,68 @@ export default function App() {
     const saved = localStorage.getItem('theme');
     return (saved as 'light' | 'dark') || 'light';
   });
+  const [config, setConfig] = useState<ClinicConfig>(() => {
+    const saved = localStorage.getItem('clinicConfig');
+    if (saved) return JSON.parse(saved);
+    
+    return {
+      notifications: {
+        agendaAlerts: 15,
+        autoReminders: true,
+        followUpAlerts: true,
+      },
+      workflow: {
+        consultationDuration: {
+          'Médico General': 20,
+          'Psicología': 50,
+          'Nutrición': 40,
+          'Ortopedia': 30,
+          'Ginecología': 30,
+          'Fisioterapia': 45,
+          'Cirugía General': 40,
+        },
+        workingDays: [1, 2, 3, 4, 5],
+        openingHour: '08:00',
+        closingHour: '18:00',
+      },
+      preferences: {
+        language: 'es',
+        theme: 'light',
+      },
+    };
+  });
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const notifiedAppointments = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
-    localStorage.setItem('theme', theme);
-  }, [theme]);
+    const interval = setInterval(() => {
+      const now = new Date();
+      const upcoming = appointments.find(apt => {
+        const aptDate = new Date(apt.date);
+        const diff = (aptDate.getTime() - now.getTime()) / (1000 * 60);
+        return diff > 0 && diff <= config.notifications.agendaAlerts && apt.status === 'Pendiente' && !notifiedAppointments.current.has(apt.id);
+      });
+
+      if (upcoming) {
+        const patient = patients.find(p => p.id === upcoming.patientId);
+        setToast({ 
+          message: `Recordatorio: ${patient?.firstName} ${patient?.lastName} en ${Math.round((new Date(upcoming.date).getTime() - Date.now()) / 60000)} min`, 
+          type: 'success' 
+        });
+        notifiedAppointments.current.add(upcoming.id);
+        setTimeout(() => setToast(null), 5000);
+      }
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [appointments, config.notifications.agendaAlerts, patients]);
+
+  useEffect(() => {
+    localStorage.setItem('clinicConfig', JSON.stringify(config));
+    if (config.preferences.theme !== theme) {
+      setTheme(config.preferences.theme);
+    }
+  }, [config]);
 
   useEffect(() => {
     window.addEventListener('beforeinstallprompt', (e) => {
@@ -148,6 +199,7 @@ export default function App() {
 
   const handleUpdateDoctor = (updatedDoctor: Doctor) => {
     setCurrentDoctor(updatedDoctor);
+    setViewingSpecialty(updatedDoctor.specialty);
     localStorage.setItem('currentDoctor', JSON.stringify(updatedDoctor));
   };
 
@@ -359,6 +411,17 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-4">
+            {viewingSpecialty !== 'Global' && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setViewingSpecialty('Global')}
+                className="hidden md:flex items-center gap-2 text-[#004990] hover:bg-blue-50 rounded-xl font-bold text-xs"
+              >
+                <LayoutGrid size={16} />
+                Panel Central
+              </Button>
+            )}
             <Button variant="ghost" size="icon" className="rounded-2xl bg-white/10 md:bg-white shadow-sm text-white md:text-slate-400 hover:text-secondary">
               <Bell size={20} />
             </Button>
@@ -427,6 +490,7 @@ export default function App() {
                 onBack={() => setViewingExpediente(null)} 
                 onSave={() => {}} // Read-only mode essentially
                 onSavePrescription={handleSavePrescription}
+                setToast={setToast}
               />
             </div>
           ) : inConsultation && currentPatient ? (
@@ -437,6 +501,7 @@ export default function App() {
               onBack={() => setInConsultation(null)} 
               onSave={(record) => handleSaveConsultation(inConsultation.id, currentPatient.id, record)}
               onSavePrescription={handleSavePrescription}
+              setToast={setToast}
             />
           ) : (
             <div className="space-y-8 animate-in fade-in duration-500">
@@ -459,216 +524,217 @@ export default function App() {
                         <Pill size={18} />
                         Nueva Receta
                       </Button>
-                      {currentDoctor.role === 'director' && (
-                        <div className="flex flex-wrap gap-2">
-                          {['Médico General', 'Psicología', 'Nutrición', 'Ortopedia', 'Ginecología', 'Fisioterapia', 'Cirugía General'].map((s) => (
-                            <Button 
-                              key={s}
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => setViewingSpecialty(s as Specialty)}
-                              className={cn(
-                                "rounded-xl border-slate-200 text-[10px] font-bold uppercase tracking-wider transition-all h-8",
-                                viewingSpecialty === s ? "bg-secondary text-white border-secondary shadow-lg shadow-secondary/20" : "bg-white text-slate-500 hover:border-secondary hover:text-secondary"
-                              )}
-                            >
-                              {s}
-                            </Button>
-                          ))}
+                    </div>
+                  </div>
+
+                  {viewingSpecialty === 'Global' ? (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                      <EspecialidadesGrid onSelect={setViewingSpecialty} />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                        <StatCard 
+                          title="Pacientes Hoy" 
+                          value={stats.pacientesHoy} 
+                          icon={Users} 
+                          trend="+12%" 
+                          trendUp={true}
+                          color="bg-blue-500"
+                        />
+                        <StatCard 
+                          title="Ingresos (Est.)" 
+                          value={`$${stats.ingresosMes}`} 
+                          icon={TrendingUp} 
+                          trend="+8%" 
+                          trendUp={true}
+                          color="bg-emerald-500"
+                        />
+                        <StatCard 
+                          title="Próximas Citas" 
+                          value={stats.proximasCitas} 
+                          icon={Calendar} 
+                          trend="-2%" 
+                          trendUp={false}
+                          color="bg-orange-500"
+                        />
+                      </div>
+
+                      {/* Specialty Specific Widgets */}
+                      <div className="mb-8">
+                        <QuickAccess onSelect={setViewingSpecialty} currentSpecialty={viewingSpecialty} />
+                      </div>
+
+                      <div className="grid grid-cols-12 gap-8">
+                        {/* Left Column: Charts and Schedule */}
+                        <div className="col-span-12 lg:col-span-8 space-y-8">
+                          {/* Main Chart Card */}
+                          <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden">
+                            <CardHeader className="flex flex-row items-center justify-between px-8 pt-8 pb-0">
+                              <div>
+                                <CardTitle className="text-lg font-bold text-[#004990]">Estadísticas de Consulta</CardTitle>
+                                <p className="text-xs text-slate-400 mt-1">
+                                  {viewingSpecialty === 'Nutrición' ? 'Tendencia de Peso Promedio' : 
+                                   viewingSpecialty === 'Ginecología' ? 'Crecimiento Fetal vs Ideal' : 
+                                   'Resumen mensual de pacientes atendidos'}
+                                </p>
+                              </div>
+                              <select className="bg-secondary text-white text-xs font-bold px-4 py-2 rounded-xl outline-none cursor-pointer shadow-lg shadow-secondary/20">
+                                <option>Anual</option>
+                                <option>Mensual</option>
+                              </select>
+                            </CardHeader>
+                            <CardContent className="p-8">
+                              <DashboardChart specialty={viewingSpecialty as Specialty} />
+                              <div className="grid grid-cols-2 gap-8 mt-8">
+                                <div className="p-6 bg-[#F5F7FB] rounded-3xl">
+                                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Esta Semana</p>
+                                  <p className="text-2xl font-bold text-[#004990] mt-1">259 <span className="text-xs font-medium text-emerald-500 ml-2">+12%</span></p>
+                                </div>
+                                <div className="p-6 bg-[#F5F7FB] rounded-3xl">
+                                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Este Mes</p>
+                                  <p className="text-2xl font-bold text-[#004990] mt-1">873 <span className="text-xs font-medium text-emerald-500 ml-2">+8%</span></p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          {/* Duty Hour / Schedule */}
+                          <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden">
+                            <CardHeader className="flex flex-row items-center justify-between px-8 pt-8 pb-0">
+                              <CardTitle className="text-lg font-bold text-[#004990]">Horario de Turno</CardTitle>
+                              <select className="bg-secondary text-white text-xs font-bold px-4 py-2 rounded-xl outline-none cursor-pointer shadow-lg shadow-secondary/20">
+                                <option>Semanal</option>
+                              </select>
+                            </CardHeader>
+                            <CardContent className="p-8">
+                              <div className="flex justify-between items-center mb-8">
+                                {['Sáb', 'Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie'].map((day, i) => (
+                                  <div key={day} className={cn(
+                                    "flex flex-col items-center gap-2 p-3 rounded-2xl transition-all cursor-pointer",
+                                    i === 2 ? "bg-[#004990] text-white shadow-xl shadow-primary/20" : "hover:bg-slate-50"
+                                  )}>
+                                    <span className="text-[10px] font-bold uppercase opacity-60">{day}</span>
+                                    <span className="text-sm font-bold">{9 + i}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="flex justify-center">
+                                <div className="bg-[#004990] px-8 py-4 rounded-full flex items-center gap-4 shadow-xl shadow-primary/20">
+                                  <span className="text-white font-bold text-lg">49 horas</span>
+                                  <span className="text-secondary font-bold text-sm">Promedio Semanal</span>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
                         </div>
-                      )}
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-                    <StatCard 
-                      title="Pacientes Hoy" 
-                      value={stats.pacientesHoy} 
-                      icon={Users} 
-                      trend="+12%" 
-                      trendUp={true}
-                      color="bg-blue-500"
-                    />
-                    <StatCard 
-                      title="Ingresos (Est.)" 
-                      value={`$${stats.ingresosMes}`} 
-                      icon={TrendingUp} 
-                      trend="+8%" 
-                      trendUp={true}
-                      color="bg-emerald-500"
-                    />
-                    <StatCard 
-                      title="Próximas Citas" 
-                      value={stats.proximasCitas} 
-                      icon={Calendar} 
-                      trend="-2%" 
-                      trendUp={false}
-                      color="bg-orange-500"
-                    />
-                  </div>
-
-                  {/* Specialty Specific Widgets */}
-                  <div className="mb-8">
-                    <QuickAccess onSelect={setViewingSpecialty} currentSpecialty={viewingSpecialty} />
-                  </div>
-
-                  <div className="grid grid-cols-12 gap-8">
-                    {/* Left Column: Charts and Schedule */}
-                    <div className="col-span-12 lg:col-span-8 space-y-8">
-                      {/* Main Chart Card */}
-                      <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden">
-                        <CardHeader className="flex flex-row items-center justify-between px-8 pt-8 pb-0">
-                          <div>
-                            <CardTitle className="text-lg font-bold text-[#004990]">Estadísticas de Consulta</CardTitle>
-                            <p className="text-xs text-slate-400 mt-1">
-                              {viewingSpecialty === 'Nutrición' ? 'Tendencia de Peso Promedio' : 
-                               viewingSpecialty === 'Ginecología' ? 'Crecimiento Fetal vs Ideal' : 
-                               'Resumen mensual de pacientes atendidos'}
-                            </p>
-                          </div>
-                          <select className="bg-secondary text-white text-xs font-bold px-4 py-2 rounded-xl outline-none cursor-pointer shadow-lg shadow-secondary/20">
-                            <option>Anual</option>
-                            <option>Mensual</option>
-                          </select>
-                        </CardHeader>
-                        <CardContent className="p-8">
-                          <DashboardChart specialty={viewingSpecialty} />
-                          <div className="grid grid-cols-2 gap-8 mt-8">
-                            <div className="p-6 bg-[#F5F7FB] rounded-3xl">
-                              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Esta Semana</p>
-                              <p className="text-2xl font-bold text-[#004990] mt-1">259 <span className="text-xs font-medium text-emerald-500 ml-2">+12%</span></p>
-                            </div>
-                            <div className="p-6 bg-[#F5F7FB] rounded-3xl">
-                              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Este Mes</p>
-                              <p className="text-2xl font-bold text-[#004990] mt-1">873 <span className="text-xs font-medium text-emerald-500 ml-2">+8%</span></p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Duty Hour / Schedule */}
-                      <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden">
-                        <CardHeader className="flex flex-row items-center justify-between px-8 pt-8 pb-0">
-                          <CardTitle className="text-lg font-bold text-[#004990]">Horario de Turno</CardTitle>
-                          <select className="bg-secondary text-white text-xs font-bold px-4 py-2 rounded-xl outline-none cursor-pointer shadow-lg shadow-secondary/20">
-                            <option>Semanal</option>
-                          </select>
-                        </CardHeader>
-                        <CardContent className="p-8">
-                          <div className="flex justify-between items-center mb-8">
-                            {['Sáb', 'Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie'].map((day, i) => (
-                              <div key={day} className={cn(
-                                "flex flex-col items-center gap-2 p-3 rounded-2xl transition-all cursor-pointer",
-                                i === 2 ? "bg-[#004990] text-white shadow-xl shadow-primary/20" : "hover:bg-slate-50"
-                              )}>
-                                <span className="text-[10px] font-bold uppercase opacity-60">{day}</span>
-                                <span className="text-sm font-bold">{9 + i}</span>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="flex justify-center">
-                            <div className="bg-[#004990] px-8 py-4 rounded-full flex items-center gap-4 shadow-xl shadow-primary/20">
-                              <span className="text-white font-bold text-lg">49 horas</span>
-                              <span className="text-secondary font-bold text-sm">Promedio Semanal</span>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Right Column: Stats and Lists */}
-                    <div className="col-span-12 lg:col-span-4 space-y-8">
-                      {/* Patient Gender Donut */}
-                      <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden">
-                        <CardHeader className="flex flex-row items-center justify-between px-8 pt-8 pb-0">
-                          <CardTitle className="text-base font-bold text-[#004990]">Género de Pacientes</CardTitle>
-                          <Button variant="ghost" size="sm" className="text-secondary font-bold text-xs hover:bg-secondary/10">Ver Todo</Button>
-                        </CardHeader>
-                        <CardContent className="p-8 flex flex-col items-center">
-                          <div className="relative w-40 h-40 mb-6">
-                            <div className="absolute inset-0 rounded-full border-[12px] border-slate-100" />
-                            <div className="absolute inset-0 rounded-full border-[12px] border-secondary border-t-transparent border-l-transparent rotate-45" />
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-2xl font-bold text-[#004990]">80%</span>
-                            </div>
-                          </div>
-                          <div className="w-full space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-[#004990]" />
-                                <span className="text-sm font-medium text-slate-500">Masculino</span>
-                              </div>
-                              <span className="text-sm font-bold">4000</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-slate-200" />
-                                <span className="text-sm font-medium text-slate-500">Femenino</span>
-                              </div>
-                              <span className="text-sm font-bold">1000</span>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Upcoming Appointments */}
-                      <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden">
-                        <CardHeader className="px-8 pt-8 pb-4">
-                          <CardTitle className="text-base font-bold text-[#004990]">Próximas Citas</CardTitle>
-                        </CardHeader>
-                        <CardContent className="px-4 pb-8">
-                          <div className="space-y-2">
-                            {filteredAppointments.slice(0, 5).map((apt) => {
-                              const patient = patients.find(p => p.id === apt.patientId);
-                              return (
-                                <div 
-                                  key={apt.id} 
-                                  onClick={() => {
-                                    setHighlightedAppointmentId(apt.id);
-                                    setActiveTab('agenda');
-                                  }}
-                                  className="flex items-center gap-4 p-4 hover:bg-slate-50 rounded-3xl transition-all cursor-pointer group"
-                                >
-                                  <div className="w-11 h-11 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 font-bold group-hover:bg-secondary group-hover:text-white transition-all">
-                                    {patient?.firstName[0]}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold truncate">{patient?.firstName} {patient?.lastName}</p>
-                                    <p className="text-[10px] text-secondary font-bold">Primera Visita</p>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-slate-400">
-                                    <Calendar size={14} className="text-secondary" />
-                                    <span className="text-xs font-bold text-slate-900">
-                                      {new Date(apt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
+                        {/* Right Column: Stats and Lists */}
+                        <div className="col-span-12 lg:col-span-4 space-y-8">
+                          {/* Patient Gender Donut */}
+                          <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden">
+                            <CardHeader className="flex flex-row items-center justify-between px-8 pt-8 pb-0">
+                              <CardTitle className="text-base font-bold text-[#004990]">Género de Pacientes</CardTitle>
+                              <Button variant="ghost" size="sm" className="text-secondary font-bold text-xs hover:bg-secondary/10">Ver Todo</Button>
+                            </CardHeader>
+                            <CardContent className="p-8 flex flex-col items-center">
+                              <div className="relative w-40 h-40 mb-6">
+                                <div className="absolute inset-0 rounded-full border-[12px] border-slate-100" />
+                                <div className="absolute inset-0 rounded-full border-[12px] border-secondary border-t-transparent border-l-transparent rotate-45" />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <div className="text-center">
+                                    <p className="text-2xl font-bold text-[#004990]">64%</p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase">Mujeres</p>
                                   </div>
                                 </div>
-                              );
-                            })}
-                          </div>
-                        </CardContent>
-                      </Card>
+                              </div>
+                              <div className="w-full space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full bg-secondary" />
+                                    <span className="text-xs font-bold text-slate-600">Femenino</span>
+                                  </div>
+                                  <span className="text-xs font-bold text-[#004990]">1,240</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full bg-slate-200" />
+                                    <span className="text-xs font-bold text-slate-600">Masculino</span>
+                                  </div>
+                                  <span className="text-xs font-bold text-[#004990]">680</span>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
 
-                      {/* Profile Card */}
-                      <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden bg-white">
-                        <CardContent className="p-8 flex flex-col items-center text-center">
-                          <div className="w-24 h-24 rounded-full bg-slate-100 mb-4 border-4 border-[#F5F7FB] shadow-inner" />
-                          <h3 className="text-lg font-bold text-[#004990]">Dr. {currentDoctor.firstName} {currentDoctor.lastName}</h3>
-                          <p className="text-xs text-slate-400 font-medium">{viewingSpecialty}</p>
-                          <div className="grid grid-cols-2 gap-8 w-full mt-8 pt-8 border-t border-slate-50">
-                            <div>
-                              <p className="text-sm font-bold text-[#004990]">4.5</p>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Rating</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold text-[#004990]">{patients.length}</p>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Pacientes</p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </div>
+                          {/* Upcoming Appointments */}
+                          <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden">
+                            <CardHeader className="px-8 pt-8 pb-4">
+                              <CardTitle className="text-base font-bold text-[#004990]">Próximas Citas</CardTitle>
+                            </CardHeader>
+                            <CardContent className="px-4 pb-8">
+                              <div className="space-y-2">
+                                {filteredAppointments.slice(0, 5).map((apt) => {
+                                  const patient = patients.find(p => p.id === apt.patientId);
+                                  return (
+                                    <div 
+                                      key={apt.id} 
+                                      onClick={() => {
+                                        setHighlightedAppointmentId(apt.id);
+                                        setActiveTab('agenda');
+                                      }}
+                                      className="flex items-center gap-4 p-4 hover:bg-slate-50 rounded-3xl transition-all cursor-pointer group"
+                                    >
+                                      <div className="w-11 h-11 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 font-bold group-hover:bg-secondary group-hover:text-white transition-all">
+                                        {patient?.firstName[0]}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-bold truncate">{patient?.firstName} {patient?.lastName}</p>
+                                        <p className="text-[10px] text-secondary font-bold">Primera Visita</p>
+                                      </div>
+                                      <div className="flex items-center gap-2 text-slate-400">
+                                        <Calendar size={14} className="text-secondary" />
+                                        <span className="text-xs font-bold text-slate-900">
+                                          {new Date(apt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          {/* Profile Card */}
+                          <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden bg-white">
+                            <CardContent className="p-8 flex flex-col items-center text-center">
+                              <div className="w-24 h-24 rounded-full bg-slate-100 mb-4 border-4 border-[#F5F7FB] shadow-inner overflow-hidden">
+                                {currentDoctor.photoUrl ? (
+                                  <img src={currentDoctor.photoUrl} alt="Dr" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-2xl">
+                                    {currentDoctor.firstName[0]}{currentDoctor.lastName[0]}
+                                  </div>
+                                )}
+                              </div>
+                              <h3 className="text-lg font-bold text-[#004990]">Dr. {currentDoctor.firstName} {currentDoctor.lastName}</h3>
+                              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{viewingSpecialty}</p>
+                              <div className="grid grid-cols-2 gap-8 w-full mt-8 pt-8 border-t border-slate-50">
+                                <div>
+                                  <p className="text-sm font-bold text-[#004990]">4.5</p>
+                                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Rating</p>
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-[#004990]">{patients.length}</p>
+                                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Pacientes</p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
@@ -678,6 +744,7 @@ export default function App() {
                   patients={patients} 
                   viewingSpecialty={viewingSpecialty} 
                   highlightedAppointmentId={highlightedAppointmentId}
+                  config={config}
                 />
               )}
 
@@ -730,15 +797,16 @@ export default function App() {
                 </div>
               )}
 
-              {activeTab === 'profile' && (
-                <ProfilePage 
+              {activeTab === 'settings' && (
+                <SettingsPage 
                   doctor={currentDoctor} 
-                  onUpdate={handleUpdateDoctor} 
+                  config={config}
+                  onUpdateDoctor={handleUpdateDoctor} 
+                  onUpdateConfig={setConfig}
                   onReset={handleResetDemo} 
-                  onThemeToggle={setTheme}
-                  currentTheme={theme}
                   onInstall={handleInstall}
                   deferredPrompt={deferredPrompt}
+                  setToast={setToast}
                 />
               )}
 
