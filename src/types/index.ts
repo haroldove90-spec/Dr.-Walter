@@ -6,6 +6,12 @@ export interface Doctor {
   lastName: string;
   specialty: Specialty;
   role: Role;
+  photoUrl?: string;
+  licenseNumber?: string;
+  university?: string;
+  signatureUrl?: string;
+  officeNumber?: string;
+  officeHours?: string;
 }
 
 export type Specialty = 'Psicología' | 'Nutrición' | 'Ortopedia' | 'Ginecología' | 'Fisioterapia' | 'Cirugía General' | 'Médico General';
@@ -39,6 +45,24 @@ export interface MedicalRecord {
   specialty: Specialty;
   diagnosis: string;
   data: SpecialtyFields;
+  prescriptions?: Prescription[];
+}
+
+export interface PrescriptionItem {
+  medication: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions?: string;
+}
+
+export interface Prescription {
+  id: string;
+  patientId: string;
+  doctorId: string;
+  date: string;
+  specialty: Specialty;
+  items: PrescriptionItem[];
 }
 
 export type PaymentMethod = 'Efectivo' | 'Tarjeta' | 'Transferencia';
@@ -63,6 +87,7 @@ export interface Patient {
   dob: string;
   gender: string;
   contact: string;
+  email?: string;
   history?: MedicalRecord[];
   fiscalData?: {
     rfc: string;

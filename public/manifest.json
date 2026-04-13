@@ -1,0 +1,21 @@
+{
+  "name": "Clínica Guidos",
+  "short_name": "Guidos",
+  "description": "Sistema de Gestión Médica Profesional",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#004990",
+  "theme_color": "#004990",
+  "icons": [
+    {
+      "src": "https://picsum.photos/seed/clinic/192/192",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://picsum.photos/seed/clinic/512/512",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

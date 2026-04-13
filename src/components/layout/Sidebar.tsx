@@ -20,7 +20,10 @@ import {
   Brain,
   Baby,
   Activity,
-  Scissors
+  Scissors,
+  User,
+  Smartphone,
+  Download
 } from 'lucide-react';
 
 const navItems = [
@@ -28,6 +31,7 @@ const navItems = [
   { icon: Calendar, label: 'Agenda', id: 'agenda' },
   { icon: Users, label: 'Pacientes', id: 'patients' },
   { icon: ClipboardList, label: 'Consultas', id: 'consultations' },
+  { icon: User, label: 'Mi Perfil', id: 'profile' },
   { icon: Utensils, label: 'Dietas', id: 'diets', specialties: ['Nutrición'] },
   { icon: Brain, label: 'Escalas', id: 'scales', specialties: ['Psicología'] },
   { icon: Baby, label: 'Partos', id: 'births', specialties: ['Ginecología'] },
@@ -43,9 +47,11 @@ interface SidebarProps {
   doctor: Doctor;
   viewingSpecialty?: Specialty;
   onSpecialtyChange?: (specialty: Specialty) => void;
+  onInstall?: () => void;
+  deferredPrompt?: any;
 }
 
-export function Sidebar({ activeTab, setActiveTab, doctor, viewingSpecialty, onSpecialtyChange }: SidebarProps) {
+export function Sidebar({ activeTab, setActiveTab, doctor, viewingSpecialty, onSpecialtyChange, onInstall, deferredPrompt }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -144,9 +150,16 @@ export function Sidebar({ activeTab, setActiveTab, doctor, viewingSpecialty, onS
         {/* User Section */}
         <div className="p-6 border-t border-white/5">
           {!isCollapsed ? (
-            <div className="flex items-center gap-4 p-4 bg-white/5 rounded-[1.5rem] border border-white/5 backdrop-blur-sm mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center text-base font-bold text-white shadow-lg shadow-secondary/20 shrink-0">
-                {doctor.firstName[0]}{doctor.lastName[0]}
+            <div 
+              className="flex items-center gap-4 p-4 bg-white/5 rounded-[1.5rem] border border-white/5 backdrop-blur-sm mb-4 cursor-pointer hover:bg-white/10 transition-all"
+              onClick={() => setActiveTab('profile')}
+            >
+              <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center text-base font-bold text-white shadow-lg shadow-secondary/20 shrink-0 overflow-hidden">
+                {doctor.photoUrl ? (
+                  <img src={doctor.photoUrl} alt="Dr" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  `${doctor.firstName[0]}${doctor.lastName[0]}`
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-white truncate">Dr. {doctor.lastName}</p>
@@ -154,9 +167,16 @@ export function Sidebar({ activeTab, setActiveTab, doctor, viewingSpecialty, onS
               </div>
             </div>
           ) : (
-            <div className="flex justify-center mb-6">
-              <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center text-base font-bold text-white shadow-lg shadow-secondary/20">
-                {doctor.firstName[0]}{doctor.lastName[0]}
+            <div 
+              className="flex justify-center mb-6 cursor-pointer hover:scale-105 transition-all"
+              onClick={() => setActiveTab('profile')}
+            >
+              <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center text-base font-bold text-white shadow-lg shadow-secondary/20 overflow-hidden">
+                {doctor.photoUrl ? (
+                  <img src={doctor.photoUrl} alt="Dr" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  `${doctor.firstName[0]}${doctor.lastName[0]}`
+                )}
               </div>
             </div>
           )}
@@ -171,6 +191,19 @@ export function Sidebar({ activeTab, setActiveTab, doctor, viewingSpecialty, onS
             <LogOut size={18} className="shrink-0" />
             {!isCollapsed && <span className="uppercase tracking-widest">Cerrar Sesión</span>}
           </button>
+
+          {deferredPrompt && (
+            <button 
+              onClick={onInstall}
+              className={cn(
+                "w-full flex items-center gap-3 p-4 mt-2 text-xs font-bold text-emerald-400 hover:bg-emerald-400/10 rounded-2xl transition-all duration-300",
+                isCollapsed && "justify-center"
+              )}
+            >
+              <Smartphone size={18} className="shrink-0" />
+              {!isCollapsed && <span className="uppercase tracking-widest">Instalar App</span>}
+            </button>
+          )}
         </div>
 
         {/* Collapse Toggle Button (Desktop Only) */}

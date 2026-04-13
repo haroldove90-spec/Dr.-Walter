@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import { Patient, Appointment } from '../types';
+import { Patient, Appointment, Prescription } from '../types';
 
 // Extend jsPDF with autotable
 declare module 'jspdf' {
@@ -59,7 +59,7 @@ export const exportToExcel = (data: any[], fileName: string, specialty?: string)
   XLSX.writeFile(workbook, `${fileName}.xlsx`);
 };
 
-export const exportConsultationToPDF = (patient: Patient, appointment: Appointment, formData: any) => {
+export const exportConsultationToPDF = (patient: Patient, appointment: Appointment, formData: any, doctor?: any) => {
   const doc = new jsPDF();
   
   // Professional Header
@@ -73,10 +73,10 @@ export const exportConsultationToPDF = (patient: Patient, appointment: Appointme
   
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text('Dr. Walter Antonio Guidos', 140, 15);
-  doc.text('Director Médico', 140, 20);
-  doc.text('Calle Médica #123, San Salvador', 140, 25);
-  doc.text('Tel: 2222-0000 | clinicaguidos.com', 140, 30);
+  doc.text(`Dr. ${doctor?.firstName || 'Walter'} ${doctor?.lastName || 'Guidos'}`, 140, 15);
+  doc.text(doctor?.specialty || 'Director Médico', 140, 20);
+  doc.text(doctor?.university || 'Calle Médica #123, San Salvador', 140, 25);
+  doc.text(`JVPM: ${doctor?.licenseNumber || '2222-0000'}`, 140, 30);
   
   // Specialty Banner
   const specialtyColor = {
@@ -164,10 +164,125 @@ export const exportConsultationToPDF = (patient: Patient, appointment: Appointme
   doc.text(formData.treatmentPlan || 'Seguimiento en próxima consulta', 20, finalY2 + 28, { maxWidth: 170 });
   
   // Signature
+  if (doctor?.signatureUrl) {
+    doc.addImage(doctor.signatureUrl, 'PNG', 85, 235, 40, 20);
+  }
   doc.line(70, 260, 140, 260);
   doc.setFontSize(10);
-  doc.text('Dr. Walter Antonio Guidos', 105, 265, { align: 'center' });
+  doc.text(`Dr. ${doctor?.firstName || 'Walter'} ${doctor?.lastName || 'Guidos'}`, 105, 265, { align: 'center' });
   doc.text('Sello y Firma', 105, 270, { align: 'center' });
   
   doc.save(`ClinicaGuidos_${appointment.specialty}_${patient.lastName}.pdf`);
+};
+
+export const exportPrescriptionToPDF = (patient: Patient, prescription: Prescription, doctor?: any) => {
+  const doc = new jsPDF();
+  
+  // Professional Header
+  doc.setFillColor(0, 73, 144); // Primary Blue
+  doc.rect(0, 0, 210, 40, 'F');
+  
+  doc.setFontSize(24);
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.text('CLÍNICA GUIDOS', 20, 25);
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Dr. ${doctor?.firstName || 'Walter'} ${doctor?.lastName || 'Guidos'}`, 140, 15);
+  doc.text(doctor?.specialty || 'Director Médico', 140, 20);
+  doc.text(doctor?.university || 'Calle Médica #123, San Salvador', 140, 25);
+  doc.text(`JVPM: ${doctor?.licenseNumber || '2222-0000'}`, 140, 30);
+  
+  // Prescription Banner
+  doc.setFillColor(0, 209, 178); // Secondary Teal
+  doc.rect(0, 40, 210, 10, 'F');
+  
+  doc.setFontSize(12);
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.text('RECETA MÉDICA', 105, 47, { align: 'center' });
+  
+  // Patient Info
+  doc.setTextColor(0, 73, 144);
+  doc.setFontSize(14);
+  doc.text('DATOS DEL PACIENTE', 20, 65);
+  
+  doc.setDrawColor(0, 73, 144);
+  doc.setLineWidth(0.5);
+  doc.line(20, 67, 190, 67);
+  
+  doc.setFontSize(10);
+  doc.setTextColor(50);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Nombre: ${patient.firstName} ${patient.lastName}`, 20, 75);
+  doc.text(`Fecha: ${new Date(prescription.date).toLocaleDateString()}`, 140, 75);
+  doc.text(`Edad: ${new Date().getFullYear() - new Date(patient.dob).getFullYear()} años`, 20, 82);
+  doc.text(`Especialidad: ${prescription.specialty}`, 140, 82);
+
+  // Rx Symbol
+  doc.setFontSize(40);
+  doc.setTextColor(0, 73, 144);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Rx', 20, 105);
+
+  // Prescription Items
+  const tableData = prescription.items.map(item => [
+    `${item.medication}\n${item.dosage}`,
+    item.frequency,
+    item.duration,
+    item.instructions || '-'
+  ]);
+
+  doc.autoTable({
+    startY: 115,
+    head: [['Medicamento / Dosis', 'Frecuencia', 'Duración', 'Indicaciones']],
+    body: tableData,
+    theme: 'striped',
+    headStyles: { fill: [0, 73, 144], textColor: 255 },
+    styles: { fontSize: 10, cellPadding: 5 },
+    columnStyles: { 
+      0: { fontStyle: 'bold', width: 60 },
+      3: { width: 60 }
+    }
+  });
+
+  // Footer / Signature
+  const finalY = (doc as any).lastAutoTable.finalY + 30;
+  
+  if (doctor?.signatureUrl) {
+    doc.addImage(doctor.signatureUrl, 'PNG', 85, finalY - 25, 40, 20);
+  }
+  doc.line(70, finalY, 140, finalY);
+  doc.setFontSize(10);
+  doc.setTextColor(0);
+  doc.text(`Dr. ${doctor?.firstName || 'Walter'} ${doctor?.lastName || 'Guidos'}`, 105, finalY + 5, { align: 'center' });
+  doc.text('Sello y Firma Autorizada', 105, finalY + 10, { align: 'center' });
+
+  // Disclaimer
+  doc.setFontSize(8);
+  doc.setTextColor(150);
+  doc.text('Esta receta tiene una validez de 30 días a partir de su fecha de emisión.', 105, 285, { align: 'center' });
+
+  const fileName = `Receta_${patient.lastName}_${new Date().getTime()}.pdf`;
+  doc.save(fileName);
+  return doc;
+};
+
+export const sharePrescription = async (patient: Patient, prescription: Prescription) => {
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: `Receta Médica - ${patient.firstName} ${patient.lastName}`,
+        text: `Hola ${patient.firstName}, adjunto tu receta médica de la Clínica Guidos.`,
+        url: window.location.href, // In a real app, this would be a link to the PDF
+      });
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
+  } else {
+    // Fallback for desktop: open WhatsApp with message
+    const message = `Hola ${patient.firstName}, te envío tu receta médica de Clínica Guidos.`;
+    window.open(`https://wa.me/${patient.contact.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
+  }
 };

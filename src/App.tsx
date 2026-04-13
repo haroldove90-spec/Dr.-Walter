@@ -20,7 +20,11 @@ import {
   Trash2,
   Edit2,
   Filter,
-  FileDown
+  FileDown,
+  Clock,
+  Stethoscope,
+  ArrowLeft,
+  CheckCircle2
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -43,6 +47,17 @@ import { GynecologyWidgets } from './components/dashboard/specialty/GynecologyWi
 import { PhysioWidgets } from './components/dashboard/specialty/PhysioWidgets';
 import { SurgeryWidgets } from './components/dashboard/specialty/SurgeryWidgets';
 import { SPECIALTY_COLORS } from './types';
+import { PatientForm } from './components/dashboard/PatientForm';
+import { CalendarView } from './components/dashboard/CalendarView';
+import { ProfilePage } from './components/dashboard/ProfilePage';
+import { DashboardChart } from './components/dashboard/DashboardChart';
+import { AdminView } from './components/dashboard/AdminView';
+import { QuickAccess } from './components/dashboard/QuickAccess';
+import { PrescriptionForm } from './components/consultation/PrescriptionForm';
+import { exportPrescriptionToPDF, sharePrescription } from './lib/exportUtils';
+import { Prescription } from './types';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Pill } from 'lucide-react';
 
 export default function App() {
   const [currentDoctor, setCurrentDoctor] = useState<Doctor | null>(() => {
@@ -62,6 +77,7 @@ export default function App() {
   });
   const [activeTab, setActiveTab] = useState('dashboard');
   const [inConsultation, setInConsultation] = useState<Appointment | null>(null);
+  const [viewingExpediente, setViewingExpediente] = useState<Patient | null>(null);
   const [patients, setPatients] = useState<Patient[]>(() => {
     const saved = localStorage.getItem('patients');
     return saved ? JSON.parse(saved) : [];
@@ -82,6 +98,58 @@ export default function App() {
     }
     return 'Médico General';
   });
+
+  // New state for CRUD and Navigation
+  const [isPatientFormOpen, setIsPatientFormOpen] = useState(false);
+  const [isPrescriptionModalOpen, setIsPrescriptionModalOpen] = useState(false);
+  const [selectedPatientForPrescription, setSelectedPatientForPrescription] = useState<Patient | null>(null);
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
+  const [highlightedAppointmentId, setHighlightedAppointmentId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('theme');
+    return (saved as 'light' | 'dark') || 'light';
+  });
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setToast({ message: '¿Deseas instalar Clínica Guidos en tu pantalla de inicio?', type: 'success' });
+    });
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+    }
+  }, []);
+
+  const handleInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    }
+  };
+
+  const handleResetDemo = () => {
+    if (window.confirm('¿Está seguro de reiniciar la demo? Se borrarán todos los datos locales.')) {
+      localStorage.clear();
+      window.location.reload();
+    }
+  };
+
+  const handleUpdateDoctor = (updatedDoctor: Doctor) => {
+    setCurrentDoctor(updatedDoctor);
+    localStorage.setItem('currentDoctor', JSON.stringify(updatedDoctor));
+  };
 
   useEffect(() => {
     localStorage.setItem('viewingSpecialty', viewingSpecialty);
@@ -139,6 +207,58 @@ export default function App() {
     setInConsultation(null);
   };
 
+  const handleSavePrescription = (prescription: Prescription) => {
+    setPatients(prev => prev.map(p => {
+      if (p.id === prescription.patientId) {
+        const history = [...(p.history || [])];
+        if (history.length > 0) {
+          const lastRecord = { ...history[history.length - 1] };
+          lastRecord.prescriptions = [...(lastRecord.prescriptions || []), prescription];
+          history[history.length - 1] = lastRecord;
+        } else {
+          history.push({
+            id: `rec-rx-${Date.now()}`,
+            date: new Date().toISOString(),
+            specialty: prescription.specialty,
+            diagnosis: 'Consulta de seguimiento / Receta',
+            data: {},
+            prescriptions: [prescription]
+          });
+        }
+        return { ...p, history };
+      }
+      return p;
+    }));
+    setToast({ message: 'Receta guardada con éxito', type: 'success' });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleAddPatient = () => {
+    setEditingPatient(null);
+    setIsPatientFormOpen(true);
+  };
+
+  const handleEditPatient = (patient: Patient) => {
+    setEditingPatient(patient);
+    setIsPatientFormOpen(true);
+  };
+
+  const handleSavePatient = (patientData: Partial<Patient>) => {
+    if (editingPatient) {
+      setPatients(prev => prev.map(p => p.id === editingPatient.id ? { ...p, ...patientData } : p));
+    } else {
+      const newPatient: Patient = {
+        ...patientData as Patient,
+        id: `p${Date.now()}`,
+        history: []
+      };
+      setPatients(prev => [...prev, newPatient]);
+    }
+    setIsPatientFormOpen(false);
+    setToast({ message: 'Paciente guardado con éxito', type: 'success' });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   const currentPatient = inConsultation 
     ? patients.find(p => p.id === inConsultation.patientId) 
     : null;
@@ -147,23 +267,6 @@ export default function App() {
     if (window.confirm('¿Está seguro de eliminar este paciente?')) {
       setPatients(prev => prev.filter(p => p.id !== id));
       setAppointments(prev => prev.filter(a => a.patientId !== id));
-    }
-  };
-
-  const handleAddPatient = () => {
-    const firstName = window.prompt('Nombre del paciente:');
-    const lastName = window.prompt('Apellido del paciente:');
-    if (firstName && lastName) {
-      const newPatient: Patient = {
-        id: Math.random().toString(36).substr(2, 9),
-        firstName,
-        lastName,
-        gender: 'Otro',
-        dob: '1990-01-01',
-        contact: '0000-0000',
-        history: []
-      };
-      setPatients(prev => [...prev, newPatient]);
     }
   };
 
@@ -217,13 +320,28 @@ export default function App() {
         doctor={currentDoctor} 
         viewingSpecialty={viewingSpecialty}
         onSpecialtyChange={setViewingSpecialty}
+        onInstall={handleInstall}
+        deferredPrompt={deferredPrompt}
       />
       
       <main className="flex-1 overflow-y-auto relative">
-        {/* Top Header Bar */}
-        <header className="sticky top-0 z-30 bg-[#F5F7FB]/80 backdrop-blur-md px-8 py-6 flex items-center justify-between">
+        {/* Toast Notification */}
+        {toast && (
+          <div className="fixed top-24 right-8 z-50 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className={cn(
+              "px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border",
+              toast.type === 'success' ? "bg-emerald-500 border-emerald-400 text-white" : "bg-rose-500 border-rose-400 text-white"
+            )}>
+              <CheckCircle2 size={18} />
+              <span className="font-bold text-sm">{toast.message}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Top Header Bar - Updated with Mobile Styling */}
+        <header className="sticky top-0 z-30 bg-[#004990] md:bg-[#F5F7FB]/80 md:backdrop-blur-md px-4 md:px-8 py-4 md:py-6 flex items-center justify-between shadow-lg md:shadow-none">
           <div className="flex items-center gap-4">
-            <div className="relative">
+            <div className="relative hidden md:block">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <Input 
                 placeholder="Buscar pacientes, citas..." 
@@ -232,31 +350,93 @@ export default function App() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+            {/* Mobile Logo/Title */}
+            <div className="md:hidden flex items-center gap-2">
+              <div className="w-8 h-8 bg-white/10 rounded-xl flex items-center justify-center text-white">
+                <Stethoscope size={18} className="text-secondary" />
+              </div>
+              <h1 className="font-bold text-white text-sm">Clínica Guidos</h1>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="rounded-2xl bg-white shadow-sm text-slate-400 hover:text-secondary">
+          <div className="flex items-center gap-2 md:gap-4">
+            <Button variant="ghost" size="icon" className="rounded-2xl bg-white/10 md:bg-white shadow-sm text-white md:text-slate-400 hover:text-secondary">
               <Bell size={20} />
             </Button>
-            <div className="h-10 w-[1px] bg-slate-200 mx-2" />
-            <div className="flex items-center gap-3">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold">Dr. {currentDoctor.lastName}</p>
+            <div className="h-8 w-[1px] bg-white/10 md:bg-slate-200 mx-1 md:mx-2" />
+            <div className="flex items-center gap-2 md:gap-3 cursor-pointer" onClick={() => setActiveTab('profile')}>
+              <div className="text-right hidden md:block">
+                <p className="text-sm font-bold text-slate-900">Dr. {currentDoctor.lastName}</p>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{viewingSpecialty}</p>
               </div>
-              <div className="w-11 h-11 rounded-2xl bg-secondary flex items-center justify-center text-white font-bold shadow-lg shadow-secondary/20">
-                {currentDoctor.firstName[0]}{currentDoctor.lastName[0]}
+              <div className="w-9 h-9 md:w-11 md:h-11 rounded-xl md:rounded-2xl bg-secondary flex items-center justify-center text-white font-bold shadow-lg shadow-secondary/20 overflow-hidden">
+                {currentDoctor.photoUrl ? (
+                  <img src={currentDoctor.photoUrl} alt="Dr" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  `${currentDoctor.firstName[0]}${currentDoctor.lastName[0]}`
+                )}
               </div>
             </div>
           </div>
         </header>
 
-        <div className="p-8">
-          {inConsultation && currentPatient ? (
+        <div className="p-4 md:p-8">
+          {isPrescriptionModalOpen && selectedPatientForPrescription && (
+            <Dialog open={isPrescriptionModalOpen} onOpenChange={setIsPrescriptionModalOpen}>
+              <DialogContent className="max-w-4xl p-0 border-none bg-transparent shadow-none">
+                <PrescriptionForm 
+                  patient={selectedPatientForPrescription}
+                  doctor={currentDoctor}
+                  specialty={viewingSpecialty}
+                  onSave={(rx) => {
+                    handleSavePrescription(rx);
+                    setIsPrescriptionModalOpen(false);
+                  }}
+                  onExport={(rx) => exportPrescriptionToPDF(selectedPatientForPrescription, rx, currentDoctor)}
+                  onShare={(rx) => sharePrescription(selectedPatientForPrescription, rx)}
+                />
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {viewingExpediente ? (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Button variant="ghost" size="icon" onClick={() => setViewingExpediente(null)} className="rounded-xl">
+                    <ArrowLeft size={20} />
+                  </Button>
+                  <h2 className="text-2xl font-bold text-[#004990]">Expediente de {viewingExpediente.firstName}</h2>
+                </div>
+                <Button 
+                  className="bg-secondary hover:bg-secondary/90 rounded-2xl shadow-lg shadow-secondary/20 gap-2"
+                  onClick={() => {
+                    const mockApt = { id: 'temp', patientId: viewingExpediente.id, specialty: viewingSpecialty, date: new Date().toISOString(), status: 'Pendiente' } as Appointment;
+                    setInConsultation(mockApt);
+                    setViewingExpediente(null);
+                  }}
+                >
+                  <Plus size={18} />
+                  Nueva Consulta
+                </Button>
+              </div>
+              
+              <ConsultationView 
+                patient={viewingExpediente} 
+                appointment={{ id: 'view', patientId: viewingExpediente.id, specialty: viewingSpecialty, date: new Date().toISOString(), status: 'Completada' } as Appointment} 
+                doctor={currentDoctor}
+                onBack={() => setViewingExpediente(null)} 
+                onSave={() => {}} // Read-only mode essentially
+                onSavePrescription={handleSavePrescription}
+              />
+            </div>
+          ) : inConsultation && currentPatient ? (
             <ConsultationView 
               patient={currentPatient} 
               appointment={inConsultation} 
+              doctor={currentDoctor}
               onBack={() => setInConsultation(null)} 
               onSave={(record) => handleSaveConsultation(inConsultation.id, currentPatient.id, record)}
+              onSavePrescription={handleSavePrescription}
             />
           ) : (
             <div className="space-y-8 animate-in fade-in duration-500">
@@ -268,24 +448,36 @@ export default function App() {
                       <h2 className="text-3xl font-bold text-[#004990]">¡Hola {currentDoctor.firstName}!</h2>
                       <p className="text-slate-500 mt-1">Bienvenido a su plataforma. Ayudemos a los pacientes a vivir una vida más saludable.</p>
                     </div>
-                    {currentDoctor.role === 'director' && (
-                      <div className="flex flex-wrap gap-2">
-                        {['Médico General', 'Psicología', 'Nutrición', 'Ortopedia', 'Ginecología', 'Fisioterapia', 'Cirugía General'].map((s) => (
-                          <Button 
-                            key={s}
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => setViewingSpecialty(s as Specialty)}
-                            className={cn(
-                              "rounded-xl border-slate-200 text-[10px] font-bold uppercase tracking-wider transition-all",
-                              viewingSpecialty === s ? "bg-secondary text-white border-secondary shadow-lg shadow-secondary/20" : "bg-white text-slate-500 hover:border-secondary hover:text-secondary"
-                            )}
-                          >
-                            {s}
-                          </Button>
-                        ))}
-                      </div>
-                    )}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button 
+                        onClick={() => {
+                          setSelectedPatientForPrescription(patients[0]); // Default to first for demo
+                          setIsPrescriptionModalOpen(true);
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-700 rounded-2xl shadow-lg shadow-emerald-200 gap-2 font-bold h-11"
+                      >
+                        <Pill size={18} />
+                        Nueva Receta
+                      </Button>
+                      {currentDoctor.role === 'director' && (
+                        <div className="flex flex-wrap gap-2">
+                          {['Médico General', 'Psicología', 'Nutrición', 'Ortopedia', 'Ginecología', 'Fisioterapia', 'Cirugía General'].map((s) => (
+                            <Button 
+                              key={s}
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setViewingSpecialty(s as Specialty)}
+                              className={cn(
+                                "rounded-xl border-slate-200 text-[10px] font-bold uppercase tracking-wider transition-all h-8",
+                                viewingSpecialty === s ? "bg-secondary text-white border-secondary shadow-lg shadow-secondary/20" : "bg-white text-slate-500 hover:border-secondary hover:text-secondary"
+                              )}
+                            >
+                              {s}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
@@ -317,7 +509,7 @@ export default function App() {
 
                   {/* Specialty Specific Widgets */}
                   <div className="mb-8">
-                    {renderSpecialtyWidgets()}
+                    <QuickAccess onSelect={setViewingSpecialty} currentSpecialty={viewingSpecialty} />
                   </div>
 
                   <div className="grid grid-cols-12 gap-8">
@@ -328,7 +520,11 @@ export default function App() {
                         <CardHeader className="flex flex-row items-center justify-between px-8 pt-8 pb-0">
                           <div>
                             <CardTitle className="text-lg font-bold text-[#004990]">Estadísticas de Consulta</CardTitle>
-                            <p className="text-xs text-slate-400 mt-1">Resumen mensual de pacientes atendidos</p>
+                            <p className="text-xs text-slate-400 mt-1">
+                              {viewingSpecialty === 'Nutrición' ? 'Tendencia de Peso Promedio' : 
+                               viewingSpecialty === 'Ginecología' ? 'Crecimiento Fetal vs Ideal' : 
+                               'Resumen mensual de pacientes atendidos'}
+                            </p>
                           </div>
                           <select className="bg-secondary text-white text-xs font-bold px-4 py-2 rounded-xl outline-none cursor-pointer shadow-lg shadow-secondary/20">
                             <option>Anual</option>
@@ -336,9 +532,7 @@ export default function App() {
                           </select>
                         </CardHeader>
                         <CardContent className="p-8">
-                          <div className="h-[250px] w-full bg-slate-50 rounded-3xl flex items-center justify-center text-slate-300 italic border-2 border-dashed border-slate-100">
-                            Visualización de Gráfica de Líneas
-                          </div>
+                          <DashboardChart specialty={viewingSpecialty} />
                           <div className="grid grid-cols-2 gap-8 mt-8">
                             <div className="p-6 bg-[#F5F7FB] rounded-3xl">
                               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Esta Semana</p>
@@ -427,7 +621,14 @@ export default function App() {
                             {filteredAppointments.slice(0, 5).map((apt) => {
                               const patient = patients.find(p => p.id === apt.patientId);
                               return (
-                                <div key={apt.id} className="flex items-center gap-4 p-4 hover:bg-slate-50 rounded-3xl transition-all cursor-pointer group">
+                                <div 
+                                  key={apt.id} 
+                                  onClick={() => {
+                                    setHighlightedAppointmentId(apt.id);
+                                    setActiveTab('agenda');
+                                  }}
+                                  className="flex items-center gap-4 p-4 hover:bg-slate-50 rounded-3xl transition-all cursor-pointer group"
+                                >
                                   <div className="w-11 h-11 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 font-bold group-hover:bg-secondary group-hover:text-white transition-all">
                                     {patient?.firstName[0]}
                                   </div>
@@ -437,7 +638,9 @@ export default function App() {
                                   </div>
                                   <div className="flex items-center gap-2 text-slate-400">
                                     <Calendar size={14} className="text-secondary" />
-                                    <span className="text-xs font-bold text-slate-900">08:00 AM</span>
+                                    <span className="text-xs font-bold text-slate-900">
+                                      {new Date(apt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
                                   </div>
                                 </div>
                               );
@@ -467,6 +670,80 @@ export default function App() {
                     </div>
                   </div>
                 </>
+              )}
+
+              {activeTab === 'agenda' && (
+                <CalendarView 
+                  appointments={appointments} 
+                  patients={patients} 
+                  viewingSpecialty={viewingSpecialty} 
+                  highlightedAppointmentId={highlightedAppointmentId}
+                />
+              )}
+
+              {activeTab === 'consultations' && (
+                <div className="space-y-6 animate-in fade-in duration-500">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-bold text-[#004990]">Consultas Pendientes</h2>
+                    <Badge className="bg-secondary text-white border-none rounded-xl px-4 py-1">
+                      {appointments.filter(a => a.status === 'Pendiente' && a.specialty === viewingSpecialty).length} Pendientes
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {appointments.filter(a => a.status === 'Pendiente' && a.specialty === viewingSpecialty).map((apt) => {
+                      const patient = patients.find(p => p.id === apt.patientId);
+                      return (
+                        <Card key={apt.id} className="border-none shadow-sm rounded-[2rem] overflow-hidden hover:shadow-xl transition-all group">
+                          <CardContent className="p-8">
+                            <div className="flex items-center gap-4 mb-6">
+                              <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-xl group-hover:bg-secondary group-hover:text-white transition-all">
+                                {patient?.firstName[0]}
+                              </div>
+                              <div>
+                                <p className="text-lg font-bold text-[#004990]">{patient?.firstName} {patient?.lastName}</p>
+                                <p className="text-xs text-slate-400 font-medium">{patient?.gender}, {new Date().getFullYear() - new Date(patient?.dob || '').getFullYear()} años</p>
+                              </div>
+                            </div>
+                            <div className="space-y-3 mb-8">
+                              <div className="flex items-center gap-3 text-slate-500">
+                                <Clock size={16} className="text-secondary" />
+                                <span className="text-sm font-medium">{new Date(apt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                              <div className="flex items-center gap-3 text-slate-500">
+                                <Activity size={16} className="text-secondary" />
+                                <span className="text-sm font-medium">Consulta de Seguimiento</span>
+                              </div>
+                            </div>
+                            <Button 
+                              className="w-full rounded-2xl bg-[#004990] hover:bg-[#003d7a] font-bold py-6 shadow-lg shadow-primary/20"
+                              onClick={() => {
+                                setInConsultation(apt);
+                              }}
+                            >
+                              Iniciar Consulta
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'profile' && (
+                <ProfilePage 
+                  doctor={currentDoctor} 
+                  onUpdate={handleUpdateDoctor} 
+                  onReset={handleResetDemo} 
+                  onThemeToggle={setTheme}
+                  currentTheme={theme}
+                  onInstall={handleInstall}
+                  deferredPrompt={deferredPrompt}
+                />
+              )}
+
+              {activeTab === 'admin' && (
+                <AdminView />
               )}
 
               {activeTab === 'patients' && (
@@ -514,14 +791,31 @@ export default function App() {
                                   <Button 
                                     size="sm" 
                                     variant="outline" 
-                                    className="gap-2 h-9 rounded-xl border-slate-200 text-slate-600 hover:bg-secondary hover:text-white hover:border-secondary transition-all"
+                                    className="gap-2 h-9 rounded-xl border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all"
                                     onClick={() => {
-                                      const mockApt = { specialty: viewingSpecialty, date: new Date().toISOString() } as any;
-                                      import('./lib/exportUtils').then(m => m.exportConsultationToPDF(p, mockApt, { 'Resumen': 'Generado desde base de datos' }));
+                                      setSelectedPatientForPrescription(p);
+                                      setIsPrescriptionModalOpen(true);
                                     }}
                                   >
-                                    <FileDown size={14} />
-                                    <span className="hidden sm:inline">PDF</span>
+                                    <Pill size={14} />
+                                    <span className="hidden sm:inline">Receta</span>
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="gap-2 h-9 rounded-xl border-slate-200 text-slate-600 hover:bg-secondary hover:text-white hover:border-secondary transition-all"
+                                    onClick={() => setViewingExpediente(p)}
+                                  >
+                                    <Search size={14} />
+                                    <span className="hidden sm:inline">Ver</span>
+                                  </Button>
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost" 
+                                    className="h-9 w-9 rounded-xl text-slate-400 hover:text-secondary hover:bg-secondary/10"
+                                    onClick={() => handleEditPatient(p)}
+                                  >
+                                    <Edit2 size={16} />
                                   </Button>
                                   <Button 
                                     size="icon" 
@@ -530,9 +824,6 @@ export default function App() {
                                     onClick={() => handleDeletePatient(p.id)}
                                   >
                                     <Trash2 size={16} />
-                                  </Button>
-                                  <Button size="icon" variant="ghost" className="h-9 w-9 rounded-xl text-slate-400 hover:text-secondary hover:bg-secondary/10">
-                                    <Edit2 size={16} />
                                   </Button>
                                 </div>
                               </TableCell>
@@ -548,6 +839,13 @@ export default function App() {
           )}
         </div>
       </main>
+
+      <PatientForm 
+        isOpen={isPatientFormOpen} 
+        onClose={() => setIsPatientFormOpen(false)} 
+        onSave={handleSavePatient}
+        patient={editingPatient}
+      />
     </div>
   );
 }

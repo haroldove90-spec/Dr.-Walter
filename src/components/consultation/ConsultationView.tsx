@@ -15,23 +15,30 @@ import {
   FileDown,
   CheckCircle2,
   History,
-  TrendingUp
+  TrendingUp,
+  Stethoscope
 } from 'lucide-react';
 import { SpecialtyForm } from './SpecialtyForm';
 import { EvolutionChart } from './EvolutionChart';
-import { Specialty, Patient, Appointment } from '@/src/types';
-import { exportConsultationToPDF } from '@/src/lib/exportUtils';
+import { PrescriptionForm } from './PrescriptionForm';
+import { Specialty, Patient, Appointment, Doctor, Prescription } from '@/src/types';
+import { exportConsultationToPDF, exportPrescriptionToPDF, sharePrescription } from '@/src/lib/exportUtils';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Pill, Share2 } from 'lucide-react';
 
 interface ConsultationViewProps {
   patient: Patient;
   appointment: Appointment;
+  doctor: Doctor;
   onBack: () => void;
   onSave: (record: any) => void;
+  onSavePrescription?: (prescription: Prescription) => void;
 }
 
-export function ConsultationView({ patient, appointment, onBack, onSave }: ConsultationViewProps) {
+export function ConsultationView({ patient, appointment, doctor, onBack, onSave, onSavePrescription }: ConsultationViewProps) {
   const [selectedSpecialty, setSelectedSpecialty] = useState<Specialty>(appointment.specialty);
+  const [activeView, setActiveView] = useState<'consultation' | 'prescription'>('consultation');
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [lastAutoSave, setLastAutoSave] = useState<string | null>(null);
@@ -77,7 +84,7 @@ export function ConsultationView({ patient, appointment, onBack, onSave }: Consu
       diagnosis,
       treatmentPlan,
       ...specialtyData
-    });
+    }, doctor);
   };
 
   return (
@@ -103,34 +110,51 @@ export function ConsultationView({ patient, appointment, onBack, onSave }: Consu
           </div>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
-          <Button variant="outline" className="flex-1 md:flex-none" onClick={handleExportPDF}>
-            <FileDown size={18} className="mr-2" />
-            PDF
-          </Button>
-          <Button 
-            className={cn(
-              "flex-1 md:flex-none transition-all duration-300",
-              saved ? "bg-emerald-600 hover:bg-emerald-700" : "bg-blue-600 hover:bg-blue-700"
-            )}
-            onClick={handleSave}
-            disabled={isSaving}
-          >
-            {isSaving ? (
-              <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-            ) : saved ? (
-              <CheckCircle2 size={18} className="mr-2" />
-            ) : (
-              <Save size={18} className="mr-2" />
-            )}
-            {saved ? 'Guardado' : 'Finalizar'}
-          </Button>
+          <Tabs value={activeView} onValueChange={(v: any) => setActiveView(v)} className="w-full md:w-auto">
+            <TabsList className="grid grid-cols-2 w-full md:w-64 rounded-2xl bg-slate-100 p-1">
+              <TabsTrigger value="consultation" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[#004990] data-[state=active]:shadow-sm font-bold text-xs">
+                <Stethoscope size={14} className="mr-2" />
+                Consulta
+              </TabsTrigger>
+              <TabsTrigger value="prescription" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[#004990] data-[state=active]:shadow-sm font-bold text-xs">
+                <Pill size={14} className="mr-2" />
+                Receta
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          
+          {activeView === 'consultation' && (
+            <>
+              <Button variant="outline" className="hidden md:flex rounded-2xl border-slate-200" onClick={handleExportPDF}>
+                <FileDown size={18} className="mr-2" />
+                PDF
+              </Button>
+              <Button 
+                className={cn(
+                  "flex-1 md:flex-none transition-all duration-300 rounded-2xl shadow-lg",
+                  saved ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200" : "bg-blue-600 hover:bg-blue-700 shadow-blue-200"
+                )}
+                onClick={handleSave}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                ) : saved ? (
+                  <CheckCircle2 size={18} className="mr-2" />
+                ) : (
+                  <Save size={18} className="mr-2" />
+                )}
+                {saved ? 'Guardado' : 'Finalizar'}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Patient Info & Evolution */}
         <div className="lg:col-span-1 space-y-6 order-2 lg:order-1">
-          <Card className="border-none shadow-sm overflow-hidden">
+          <Card className="border-none shadow-sm overflow-hidden rounded-[2rem]">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg shrink-0">
@@ -226,100 +250,114 @@ export function ConsultationView({ patient, appointment, onBack, onSave }: Consu
 
         {/* Main Form Area */}
         <div className="lg:col-span-2 space-y-6 order-1 lg:order-2">
-          <Card className="border-none shadow-sm">
-            <CardHeader className="border-b border-zinc-100 px-4 lg:px-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {activeView === 'consultation' ? (
+            <Card className="border-none shadow-sm rounded-[2rem]">
+              <CardHeader className="border-b border-zinc-100 px-4 lg:px-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <CardTitle>Expediente Clínico</CardTitle>
+                    <CardDescription>Complete la evolución del paciente</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2 bg-zinc-50 p-1 rounded-lg border border-zinc-100">
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase px-2">Módulo</span>
+                    <select 
+                      value={selectedSpecialty}
+                      onChange={(e) => setSelectedSpecialty(e.target.value as Specialty)}
+                      className="text-xs font-bold bg-white border border-zinc-200 rounded-md px-2 py-1 focus:ring-0 cursor-pointer outline-none"
+                    >
+                      <option value="Médico General">Médico General</option>
+                      <option value="Psicología">Psicología</option>
+                      <option value="Nutrición">Nutrición</option>
+                      <option value="Ortopedia">Ortopedia</option>
+                      <option value="Ginecología">Ginecología</option>
+                      <option value="Fisioterapia">Fisioterapia</option>
+                      <option value="Cirugía General">Cirugía General</option>
+                    </select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4 lg:p-6">
+                <div className="mb-8">
+                  <h3 className="text-sm font-bold text-zinc-900 mb-4 flex items-center gap-2">
+                    <div className="w-1.5 h-4 bg-blue-600 rounded-full" />
+                    Signos Vitales
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:gap-4">
+                    <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-100">
+                      <p className="text-[10px] font-bold text-zinc-400 uppercase">Presión Art.</p>
+                      <p className="text-lg font-bold">120/80</p>
+                    </div>
+                    <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-100">
+                      <p className="text-[10px] font-bold text-zinc-400 uppercase">Frec. Card.</p>
+                      <p className="text-lg font-bold">72 <span className="text-xs font-normal">bpm</span></p>
+                    </div>
+                    <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-100">
+                      <p className="text-[10px] font-bold text-zinc-400 uppercase">Temp.</p>
+                      <p className="text-lg font-bold">36.5 <span className="text-xs font-normal">°C</span></p>
+                    </div>
+                    <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-100">
+                      <p className="text-[10px] font-bold text-zinc-400 uppercase">Saturación</p>
+                      <p className="text-lg font-bold">98 <span className="text-xs font-normal">%</span></p>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator className="my-8" />
+
                 <div>
-                  <CardTitle>Expediente Clínico</CardTitle>
-                  <CardDescription>Complete la evolución del paciente</CardDescription>
+                  <h3 className="text-sm font-bold text-zinc-900 mb-6 flex items-center gap-2">
+                    <div className="w-1.5 h-4 bg-blue-600 rounded-full" />
+                    Evaluación de Especialidad: {selectedSpecialty}
+                  </h3>
+                  
+                  <SpecialtyForm specialty={selectedSpecialty} onChange={setSpecialtyData} />
                 </div>
-                <div className="flex items-center gap-2 bg-zinc-50 p-1 rounded-lg border border-zinc-100">
-                  <span className="text-[10px] font-bold text-zinc-400 uppercase px-2">Módulo</span>
-                  <select 
-                    value={selectedSpecialty}
-                    onChange={(e) => setSelectedSpecialty(e.target.value as Specialty)}
-                    className="text-xs font-bold bg-white border border-zinc-200 rounded-md px-2 py-1 focus:ring-0 cursor-pointer outline-none"
-                  >
-                    <option value="Médico General">Médico General</option>
-                    <option value="Psicología">Psicología</option>
-                    <option value="Nutrición">Nutrición</option>
-                    <option value="Ortopedia">Ortopedia</option>
-                    <option value="Ginecología">Ginecología</option>
-                    <option value="Fisioterapia">Fisioterapia</option>
-                    <option value="Cirugía General">Cirugía General</option>
-                  </select>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 lg:p-6">
-              <div className="mb-8">
-                <h3 className="text-sm font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                  <div className="w-1.5 h-4 bg-blue-600 rounded-full" />
-                  Signos Vitales
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:gap-4">
-                  <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-100">
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase">Presión Art.</p>
-                    <p className="text-lg font-bold">120/80</p>
+
+                <Separator className="my-8" />
+
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2">
+                    <div className="w-1.5 h-4 bg-blue-600 rounded-full" />
+                    Diagnóstico y Plan
+                  </h3>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-zinc-500 flex items-center gap-1">
+                      Diagnóstico Principal (CIE-10) <span className="text-red-500">*</span>
+                    </label>
+                    <Input 
+                      placeholder="Buscar diagnóstico..." 
+                      className="bg-zinc-50 border-zinc-200" 
+                      value={diagnosis}
+                      onChange={(e) => setDiagnosis(e.target.value)}
+                    />
                   </div>
-                  <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-100">
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase">Frec. Card.</p>
-                    <p className="text-lg font-bold">72 <span className="text-xs font-normal">bpm</span></p>
-                  </div>
-                  <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-100">
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase">Temp.</p>
-                    <p className="text-lg font-bold">36.5 <span className="text-xs font-normal">°C</span></p>
-                  </div>
-                  <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-100">
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase">Saturación</p>
-                    <p className="text-lg font-bold">98 <span className="text-xs font-normal">%</span></p>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-zinc-500 flex items-center gap-1">
+                      Plan de Tratamiento / Receta <span className="text-red-500">*</span>
+                    </label>
+                    <textarea 
+                      className="w-full min-h-[120px] p-3 rounded-md border border-zinc-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+                      placeholder="Indique medicamentos, dosis y duración..." 
+                      value={treatmentPlan}
+                      onChange={(e) => setTreatmentPlan(e.target.value)}
+                    />
                   </div>
                 </div>
-              </div>
-
-              <Separator className="my-8" />
-
-              <div>
-                <h3 className="text-sm font-bold text-zinc-900 mb-6 flex items-center gap-2">
-                  <div className="w-1.5 h-4 bg-blue-600 rounded-full" />
-                  Evaluación de Especialidad: {selectedSpecialty}
-                </h3>
-                
-                <SpecialtyForm specialty={selectedSpecialty} onChange={setSpecialtyData} />
-              </div>
-
-              <Separator className="my-8" />
-
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2">
-                  <div className="w-1.5 h-4 bg-blue-600 rounded-full" />
-                  Diagnóstico y Plan
-                </h3>
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-zinc-500 flex items-center gap-1">
-                    Diagnóstico Principal (CIE-10) <span className="text-red-500">*</span>
-                  </label>
-                  <Input 
-                    placeholder="Buscar diagnóstico..." 
-                    className="bg-zinc-50 border-zinc-200" 
-                    value={diagnosis}
-                    onChange={(e) => setDiagnosis(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-zinc-500 flex items-center gap-1">
-                    Plan de Tratamiento / Receta <span className="text-red-500">*</span>
-                  </label>
-                  <textarea 
-                    className="w-full min-h-[120px] p-3 rounded-md border border-zinc-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
-                    placeholder="Indique medicamentos, dosis y duración..." 
-                    value={treatmentPlan}
-                    onChange={(e) => setTreatmentPlan(e.target.value)}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ) : (
+            <PrescriptionForm 
+              patient={patient}
+              doctor={doctor}
+              specialty={selectedSpecialty}
+              onSave={(rx) => {
+                onSavePrescription?.(rx);
+                alert('Receta guardada en el expediente.');
+              }}
+              onExport={(rx) => exportPrescriptionToPDF(patient, rx, doctor)}
+              onShare={(rx) => sharePrescription(patient, rx)}
+            />
+          )}
         </div>
       </div>
     </div>
